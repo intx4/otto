@@ -1,3 +1,5 @@
+<p align="center"><img src="icons/icon128.png" width="128" height="128" alt="Otto, a green pixel-art alien with headphones"></p>
+
 # Otto: Organizer of Tabs Too Overpowered
 
 Otto is a Chrome extension that sorts the tabs in your window into Chrome tab groups by topic. It sends each tab's title and URL to an LLM provider you choose, then creates named, colored groups from the reply. It also lists duplicate tabs you can close.
