@@ -14,7 +14,7 @@ const inflight = { now: 0, max: 0 };
 
 // The mock groups every numbered tab line by the first path segment of its URL and, like the real
 // prompt rule, never starts a new group with a single tab.
-const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' }, pillows: { name: 'Pillows', color: 'blue' }, cuscini: { name: 'Cuscini', color: 'purple' } };
+const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' }, pillows: { name: 'Pillows', color: 'blue' }, cuscini: { name: 'Cuscini', color: 'purple' }, books: { name: 'Books', color: 'yellow' } };
 
 function cannedPlan(userText) {
   const groups = {};
@@ -168,6 +168,25 @@ try {
   await new Promise((r) => setTimeout(r, 6000));
   assert.equal(requests.length, settled, 'a reload of a grouped tab sends nothing');
   assert.ok(requests.length - before2 >= 2);
+
+  let autoRuns = requests.length;
+  const navigate = (from, to) =>
+    ext(async ({ windowId, from, to }) => {
+      const tab = (await chrome.tabs.query({ windowId })).find((t) => t.url === from);
+      await chrome.tabs.update(tab.id, { url: to });
+      for (let i = 0; i < 50 && (await chrome.tabs.get(tab.id)).status !== 'complete'; i++) await new Promise((r) => setTimeout(r, 100));
+    }, { windowId, from: origin + from, to: origin + to });
+  await navigate('/news/2', '/books/1');
+  await navigate('/pillows/2', '/books/2');
+  await navigate('/news/3', '/recipes/cake');
+  await new Promise((r) => setTimeout(r, 4000));
+  assert.equal(requests.length, autoRuns, 'a grouped tab that navigates starts no auto run');
+  assert.equal((await ext((windowId) => chrome.runtime.sendMessage({ type: 'organize', windowId }), windowId)).ok, true);
+  const regrouped = await snapshot(windowId);
+  assert.deepEqual(regrouped.find((g) => g.title === 'Books')?.paths, ['/books/1', '/books/2']);
+  assert.deepEqual(regrouped.find((g) => g.title === 'Recipes')?.paths, ['/recipes/cake', '/recipes/pasta', '/recipes/soup']);
+  assert.deepEqual(regrouped.find((g) => g.title === 'News')?.paths, ['/news/1', '/news/1']);
+  console.log('PASS manual organize moves edited grouped tabs into an existing group or a new one');
 
   const beforeBurst = requests.length;
   inflight.max = 0;
