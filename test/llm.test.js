@@ -71,3 +71,22 @@ test('a 200 reply that is not a Messages response names the problem', async () =
     { message: 'Unexpected reply from the provider, check the base URL: {"Output":{"__type":"com.amazon.coral.service#UnknownOperationException"},"Version":"1.0"}' },
   );
 });
+
+test('messages providers turn thinking off, and retry with it on when the model rejects that', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body);
+    if (body.thinking) return new Response(JSON.stringify({ error: { message: 'thinking.type disabled is not supported for this model' } }), { status: 400 });
+    return new Response(JSON.stringify(messagesReply), { status: 200 });
+  };
+  assert.deepEqual(await complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k', model: 'claude-opus-5-5' } } }), request), plan);
+  assert.deepEqual(calls.map((c) => c.thinking), [{ type: 'disabled' }, undefined]);
+});
+
+test('a 400 unrelated to thinking is reported without a retry', async () => {
+  let count = 0;
+  globalThis.fetch = async () => (count++, new Response(JSON.stringify({ error: { message: 'model not found' } }), { status: 400 }));
+  await assert.rejects(complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k' } } }), request), { message: 'HTTP 400: model not found' });
+  assert.equal(count, 1);
+});

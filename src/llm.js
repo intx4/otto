@@ -31,6 +31,8 @@ const messagesBody = ({ model }, { system, user, schema }) => ({
   system,
   messages: [{ role: 'user', content: user }],
   output_config: { format: { type: 'json_schema', schema } },
+  // Grouping tabs needs no reasoning; thinking roughly triples latency on Haiku 5.5.
+  thinking: { type: 'disabled' },
 });
 
 function readMessages(data) {
@@ -111,6 +113,21 @@ export function baseUrlFor(provider, config) {
   return provider.path.startsWith('/v1/') ? base.replace(/\/v1$/, '') : base;
 }
 
+async function send(provider, config, url, payload) {
+  const body = JSON.stringify(payload);
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: await provider.headers(config, { url, body }),
+      body,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    const reason = err?.name === 'TimeoutError' ? 'timed out' : 'could not connect';
+    throw new LlmError(`Request to ${provider.label} ${reason}. Check the base URL and your network.`);
+  }
+}
+
 export async function complete(settings, request) {
   const provider = PROVIDERS[settings.provider];
   if (!provider) throw new LlmError(`Unknown provider "${settings.provider}".`);
@@ -120,18 +137,12 @@ export async function complete(settings, request) {
   if (!config.model) throw new LlmError('No model set. Open Options to choose one.');
 
   const url = baseUrlFor(provider, config) + provider.path;
-  const body = JSON.stringify(provider.body(config, request));
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: await provider.headers(config, { url, body }),
-      body,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch (err) {
-    const reason = err?.name === 'TimeoutError' ? 'timed out' : 'could not connect';
-    throw new LlmError(`Request to ${provider.label} ${reason}. Check the base URL and your network.`);
+  const payload = provider.body(config, request);
+  let res = await send(provider, config, url, payload);
+  // Models that always think (Opus 5.5, Fable) reject disabled thinking; retry once with the model's default.
+  if (res.status === 400 && payload.thinking && /thinking/i.test((await httpError(res.clone())).message)) {
+    delete payload.thinking;
+    res = await send(provider, config, url, payload);
   }
   if (!res.ok) throw await httpError(res);
 
