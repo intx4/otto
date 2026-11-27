@@ -5,6 +5,10 @@
   "scripts": {
     "test": "node --test",
     "check": "node scripts/check-extension.mjs",
-    "icons": "python3 scripts/make_icons.py"
+    "icons": "python3 scripts/make_icons.py",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.19.0"
   }
 }
