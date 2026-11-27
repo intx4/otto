@@ -210,9 +210,11 @@ try {
   await groupPopup.click('#expand-all');
   await new Promise((r) => setTimeout(r, 500));
   assert.ok((await collapsedState()).every((c) => !c), 'Expand all opens every group');
+  const beforeExtPage = requests.length;
+  await new Promise((r) => setTimeout(r, 4000));
+  assert.equal(requests.length, beforeExtPage, "opening one of Otto's own pages in a tab starts no auto run");
   await groupPopup.close();
-  await new Promise((r) => setTimeout(r, 5000));
-  console.log('PASS popup Collapse all and Expand all toggle every group in the window');
+  console.log('PASS popup Collapse all and Expand all toggle every group; an extension page tab starts no auto run');
 
   const beforeBurst = requests.length;
   inflight.max = 0;

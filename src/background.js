@@ -13,7 +13,8 @@ import { loadSettings, isConfigured } from './settings.js';
 const DEBOUNCE_MS = 3000;
 const SAMPLES_PER_GROUP = 3;
 const MAX_UNGROUPED = 40;
-const BLANK_URL = /^(chrome:\/\/(newtab|new-tab-page)\/?|about:blank|chrome-search:\/\/)/;
+// Auto runs only consider web pages; new tab, chrome:// and extension pages (Otto's own included) stay put.
+const WEB_URL = /^(https?|file):/;
 
 const ACTIVITY_LIMIT = 20;
 const SPINNER_COLOR = '#1a73e8';
@@ -61,7 +62,7 @@ function prepare(kind, windowId, tabs, groups, settings) {
   }
   // Every ungrouped tab is a candidate, so a tab can start a group with one that loaded in an earlier run.
   const newTabs = tabs
-    .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !BLANK_URL.test(t.url ?? ''))
+    .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && WEB_URL.test(t.url ?? ''))
     .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
     .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
@@ -207,7 +208,7 @@ function scheduleAuto(windowId) {
 // Stateless trigger: any ungrouped tab finishing a page load schedules an auto run for its window.
 // Holding no per-tab state means nothing is lost when Chrome stops the idle service worker.
 chrome.tabs.onUpdated.addListener(async (_tabId, info, tab) => {
-  if (info.status !== 'complete' || tab.pinned || tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || BLANK_URL.test(tab.url ?? '')) return;
+  if (info.status !== 'complete' || tab.pinned || tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || !WEB_URL.test(tab.url ?? '')) return;
   const settings = await loadSettings();
   if (!settings.autoOrganize || !isConfigured(settings)) return;
   scheduleAuto(tab.windowId);
