@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Otto Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Otto options</h1>
+      <form id="form">
+        <label>
+          Provider
+          <select id="provider"></select>
+        </label>
+
+        <label id="base-url-row">
+          Base URL
+          <input id="baseUrl" type="url" placeholder="https://api.openai.com/v1" />
+          <small>OpenAI, OpenRouter (https://openrouter.ai/api/v1), Ollama (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1). Otto asks for access to a custom host when you save.</small>
+        </label>
+
+        <label>
+          API key
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
+          <small>Stored only on this device (chrome.storage.local). Never synced.</small>
+        </label>
+
+        <label>
+          Model
+          <input id="model" type="text" spellcheck="false" />
+        </label>
+
+        <label>
+          Max groups
+          <input id="maxGroups" type="number" min="0" max="30" />
+          <small>A hint for the model. 0 means no limit.</small>
+        </label>
+
+        <label class="check">
+          <input id="sendFullUrls" type="checkbox" />
+          Send full URLs
+        </label>
+        <small>Off: Otto sends only the origin and path (no query string or fragment). On: full URLs, which can help grouping but may include tokens or search terms.</small>
+
+        <label class="check">
+          <input id="autoOrganize" type="checkbox" />
+          Auto-organize new tabs
+        </label>
+
+        <div class="actions">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="test">Test connection</button>
+        </div>
+        <p id="status" role="status"></p>
+      </form>
+      <p class="shortcut">Keyboard shortcut: set or change it at <code>chrome://extensions/shortcuts</code>.</p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
