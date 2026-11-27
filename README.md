@@ -84,7 +84,7 @@ npm test            # unit tests (node --test, no dependencies), including AWS S
 npm run check       # manifest parses, every referenced file exists, every JS file parses
 npm install         # installs puppeteer (dev only) for the end-to-end test
 npm run e2e         # loads the extension into Chrome for Testing against a local mock provider
-npm run icons       # regenerates icons/ with the Python standard library
+npm run icons       # rebuilds icons/ from icons/source.png (macOS, uses sips)
 ```
 
 The end-to-end test needs Chrome for Testing, which `npm install` downloads through puppeteer. Chrome stable ignores `--load-extension`. Set `HEADFUL=1` to watch the browser.
