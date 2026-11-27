@@ -55,3 +55,19 @@ test('missing credentials are named before any request', async () => {
   await assert.rejects(complete(normalizeSettings({ provider: 'anthropic' }), request), /No API key set/);
   assert.equal(calls.length, 0);
 });
+
+test('a base URL ending in /v1 does not double the /v1 on messages providers', async () => {
+  const calls = capture(messagesReply);
+  const base = 'https://bedrock-runtime.eu-central-1.amazonaws.com/anthropic/v1';
+  await complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k', baseUrl: base } } }), request);
+  await complete(normalizeSettings({ provider: 'bedrock', providers: { bedrock: { apiKey: 'k', baseUrl: `${base}/` } } }), request);
+  assert.deepEqual(calls.map((c) => c.url), [`${base}/messages`, `${base}/messages`]);
+});
+
+test('a 200 reply that is not a Messages response names the problem', async () => {
+  capture({ Output: { __type: 'com.amazon.coral.service#UnknownOperationException' }, Version: '1.0' });
+  await assert.rejects(
+    complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k' } } }), request),
+    { message: 'Unexpected reply from the provider, check the base URL: {"Output":{"__type":"com.amazon.coral.service#UnknownOperationException"},"Version":"1.0"}' },
+  );
+});

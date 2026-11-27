@@ -9,6 +9,10 @@ function trimSlash(url) {
   return String(url ?? '').trim().replace(/\/+$/, '');
 }
 
+function unexpectedReply(data) {
+  return new LlmError(`Unexpected reply from the provider, check the base URL: ${JSON.stringify(data).slice(0, 200)}`);
+}
+
 async function httpError(res) {
   let detail = '';
   try {
@@ -32,7 +36,8 @@ const messagesBody = ({ model }, { system, user, schema }) => ({
 function readMessages(data) {
   if (data.stop_reason === 'refusal') throw new LlmError('The model declined this request.');
   if (data.stop_reason === 'max_tokens') throw new LlmError('The reply was cut off (too many tabs?).');
-  const text = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  if (!Array.isArray(data.content)) throw unexpectedReply(data);
+  const text = data.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
   return extractJson(text);
 }
 
@@ -92,14 +97,19 @@ export const PROVIDERS = {
       response_format: { type: 'json_schema', json_schema: { name: 'tab_plan', strict: true, schema } },
     }),
     read: (data) => {
-      const message = data.choices?.[0]?.message;
+      if (!Array.isArray(data.choices)) throw unexpectedReply(data);
+      const message = data.choices[0]?.message;
       if (message?.refusal) throw new LlmError(`The model declined: ${message.refusal}`);
       return extractJson(message?.content);
     },
   },
 };
 
-export const baseUrlFor = (provider, config) => trimSlash(config.baseUrl) || provider.defaultBaseUrl(config);
+// Messages endpoints accept a base URL with or without its trailing /v1, since SDK env vars include it.
+export function baseUrlFor(provider, config) {
+  const base = trimSlash(config.baseUrl) || provider.defaultBaseUrl(config);
+  return provider.path.startsWith('/v1/') ? base.replace(/\/v1$/, '') : base;
+}
 
 export async function complete(settings, request) {
   const provider = PROVIDERS[settings.provider];
