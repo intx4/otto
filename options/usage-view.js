@@ -51,10 +51,8 @@ function renderChart(byDay) {
     const x = pad.left + i * slot + (slot - barW) / 2;
     const total = tokens(d);
     if (total > 0) {
-      const top = y(total);
-      const r = Math.min(4, barW / 2, pad.top + plotH - top);
-      const base = pad.top + plotH;
-      svg.append(el('path', { class: 'bar', d: `M${x},${base}V${top + r}Q${x},${top} ${x + r},${top}H${x + barW - r}Q${x + barW},${top} ${x + barW},${top + r}V${base}Z` }));
+      const top = Math.round(y(total));
+      svg.append(el('rect', { class: 'bar', x: Math.round(x), y: top, width: Math.round(barW), height: pad.top + plotH - top }));
     }
     if (labelAt.has(i)) svg.append(el('text', { x: x + barW / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis' }, dateLabel(d.day)));
   });

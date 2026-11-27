@@ -1,7 +1,7 @@
 import { saveSettings } from '../src/settings.js';
 
 const $ = (id) => document.getElementById(id);
-const CLOSE_ICON = '<svg viewBox="0 0 16 16"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>';
+const CLOSE_ICON = '<svg class="px-icon" viewBox="0 0 7 7" width="14" height="14" aria-hidden="true"><path d="M0 0h1v1h-1zM6 0h1v1h-1zM1 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM4 2h1v1h-1zM3 3h1v1h-1zM2 4h1v1h-1zM4 4h1v1h-1zM1 5h1v1h-1zM5 5h1v1h-1zM0 6h1v1h-1zM6 6h1v1h-1z"/></svg>';
 const { id: windowId } = await chrome.windows.getCurrent();
 
 function send(type, extra = {}) {

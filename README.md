@@ -108,3 +108,5 @@ To add a provider, add an entry to `PROVIDERS` in `src/llm.js`. Its `defaults` k
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+The bundled fonts in `fonts/` (Press Start 2P, Geist and Geist Mono) are licensed under the SIL Open Font License 1.1. Their license texts are in `fonts/`.

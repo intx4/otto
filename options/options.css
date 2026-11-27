@@ -1,28 +1,32 @@
 body {
-  padding: 48px 20px 64px;
+  padding: 40px 20px 64px;
 }
 
 main {
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
 }
 
 header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 32px;
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .logo {
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  box-shadow:
+    0 calc(-1 * var(--p)) 0 0 var(--ink),
+    0 var(--p) 0 0 var(--ink),
+    calc(-1 * var(--p)) 0 0 0 var(--ink),
+    var(--p) 0 0 0 var(--ink);
 }
 
 h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  font: 20px/1 var(--pixel);
 }
 
 header p {
@@ -31,17 +35,15 @@ header p {
 }
 
 h2 {
-  margin: 28px 0 8px;
-  font-size: 13px;
-  font-weight: 500;
+  margin: 32px 0 14px;
+  font: 10px/1 var(--pixel);
+  text-transform: uppercase;
   color: var(--muted);
 }
 
 .card {
+  margin: var(--p);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
 }
 
 .field {
@@ -49,17 +51,17 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 14px 16px;
+  padding: 16px;
 }
 
 .field + .field {
-  border-top: 1px solid var(--border);
+  border-top: var(--p) dashed var(--line);
 }
 
 .field.stacked {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
 }
 
 .meta {
@@ -68,12 +70,12 @@ h2 {
 }
 
 .meta label {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .meta p {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 3px 0 0;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
@@ -84,28 +86,17 @@ input[type='number'],
 select {
   flex: none;
   width: 260px;
-  height: 30px;
+  height: 32px;
+  margin: var(--p);
   padding: 0 10px;
-  font: inherit;
+  font: 13.5px/1 var(--body);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  transition: border-color 0.12s;
+  border: none;
 }
 
 .field.stacked input {
-  width: 100%;
-}
-
-select {
-  appearance: none;
-  padding-right: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238a8f98' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 6.5 3 3 3-3'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 14px;
-  cursor: pointer;
+  width: calc(100% - 2 * var(--p));
 }
 
 input.narrow {
@@ -114,24 +105,26 @@ input.narrow {
 
 input:hover,
 select:hover {
-  border-color: var(--faint);
-}
-
-input:focus-visible,
-select:focus-visible {
-  border-color: var(--accent);
+  background: var(--hover);
 }
 
 input::placeholder {
   color: var(--faint);
 }
 
+select {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges' fill='%235d5a6b'%3E%3Cpath d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 8px;
+  cursor: pointer;
+}
+
 #shortcut {
   height: 22px;
-  padding: 0 8px;
-  opacity: 1;
-  color: var(--muted);
-  border-color: var(--border-strong);
+  margin: var(--p);
 }
 
 footer {
@@ -139,53 +132,48 @@ footer {
   bottom: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-top: 24px;
-  padding: 12px 0;
+  padding: 14px 0;
   background: var(--bg);
+  border-top: var(--p) solid var(--ink);
 }
 
 footer .status {
   flex: 1;
 }
 
-@media (max-width: 560px) {
-  .field {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  input[type='text'],
-  input[type='url'],
-  input[type='password'],
-  select {
-    width: 100%;
-  }
+footer button {
+  height: 34px;
 }
 
 .tabs {
   display: flex;
-  gap: 4px;
-  margin: -12px 0 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: var(--p) solid var(--ink);
 }
 
 .tabs a {
   padding: 8px 10px;
-  margin-bottom: -1px;
+  font: 10px/1 var(--pixel);
+  text-transform: uppercase;
   color: var(--muted);
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
 }
 
 .tabs a:hover {
   color: var(--text);
+  background: var(--hover);
 }
 
 .tabs a[aria-current='true'] {
-  color: var(--text);
-  border-bottom-color: var(--accent);
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.tabs a[aria-current='true']::before {
+  content: '> ';
 }
 
 .usage-head {
@@ -193,7 +181,7 @@ footer .status {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 28px 0 12px;
+  margin: 28px 0 16px;
 }
 
 .usage-head h2 {
@@ -202,67 +190,61 @@ footer .status {
 
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  gap: 2px;
-  background: var(--hover);
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  gap: 8px;
 }
 
 .segmented button {
-  height: 24px;
-  padding: 0 10px;
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
+  height: 26px;
+  padding: 0 8px;
 }
 
 .segmented button[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow), 0 0 0 1px var(--border-strong);
+  color: var(--accent-fg);
+  background: var(--accent);
 }
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .tile {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
+  gap: 10px;
+  margin: var(--p);
+  padding: 12px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 calc(-1 * var(--p)) 0 0 var(--ink),
+    0 var(--p) 0 0 var(--ink),
+    calc(-1 * var(--p)) 0 0 0 var(--ink),
+    var(--p) 0 0 0 var(--ink),
+    inset 0 calc(-1 * var(--p)) 0 0 var(--shade);
 }
 
 .tile span {
-  font-size: 12px;
+  font: 7px/1 var(--pixel);
+  text-transform: uppercase;
   color: var(--muted);
 }
 
 .tile strong {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
+  font: 14px/1 var(--pixel);
+  font-weight: normal;
 }
 
 .chart-card {
   position: relative;
-  padding: 14px 16px 10px;
+  padding: 16px 16px 10px;
 }
 
 .chart-title {
-  margin-bottom: 8px;
-  font-weight: 500;
+  margin-bottom: 12px;
+  font: 9px/1 var(--pixel);
+  text-transform: uppercase;
 }
 
 #chart svg {
@@ -270,29 +252,30 @@ footer .status {
   width: 100%;
   height: auto;
   overflow: visible;
-  stroke: none;
+  shape-rendering: crispEdges;
 }
 
 #chart .bar {
   fill: var(--accent);
+  stroke: var(--ink);
+  stroke-width: 2;
   pointer-events: none;
 }
 
 #chart .grid {
-  stroke: var(--border);
+  stroke: var(--line);
   stroke-width: 1;
-  stroke-dasharray: 2 3;
+  stroke-dasharray: 3 3;
 }
 
 #chart .baseline {
-  stroke: var(--border-strong);
-  stroke-width: 1;
+  stroke: var(--ink);
+  stroke-width: 2;
 }
 
 #chart .axis {
-  fill: var(--faint);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
+  fill: var(--muted);
+  font: 7px var(--pixel);
 }
 
 #chart .hit {
@@ -306,27 +289,30 @@ footer .status {
 .tooltip {
   position: absolute;
   z-index: 1;
-  min-width: 180px;
-  padding: 8px 10px;
+  min-width: 200px;
+  padding: 10px 12px;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
   pointer-events: none;
+  box-shadow:
+    0 calc(-1 * var(--p)) 0 0 var(--ink),
+    0 var(--p) 0 0 var(--ink),
+    calc(-1 * var(--p)) 0 0 0 var(--ink),
+    var(--p) 0 0 0 var(--ink),
+    calc(2 * var(--p)) calc(2 * var(--p)) 0 0 var(--shade);
 }
 
 .tt-head {
-  margin-bottom: 4px;
-  font-weight: 500;
+  margin-bottom: 8px;
+  font: 8px/1.4 var(--pixel);
 }
 
 .tt-row {
   display: flex;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   justify-content: space-between;
   gap: 16px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 
 table {
@@ -335,13 +321,9 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-.card:has(table) {
-  overflow-x: auto;
-}
-
 th,
 td {
-  padding: 9px 10px;
+  padding: 10px 12px;
   text-align: right;
   white-space: nowrap;
 }
@@ -352,18 +334,18 @@ td:first-child {
 }
 
 th {
-  font-size: 12px;
-  font-weight: 500;
+  font: 7px/1.3 var(--pixel);
+  text-transform: uppercase;
   color: var(--muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--p) solid var(--ink);
 }
 
 tbody tr + tr td {
-  border-top: 1px solid var(--border);
+  border-top: var(--p) dashed var(--line);
 }
 
 td:first-child {
-  max-width: 220px;
+  max-width: 230px;
 }
 
 td .model {
@@ -371,27 +353,52 @@ td .model {
   text-overflow: ellipsis;
 }
 
+td .model {
+  font-weight: 500;
+}
+
 td .provider {
   font-size: 12px;
   color: var(--muted);
 }
 
+.card:has(table) {
+  overflow-x: auto;
+}
+
 .empty {
   margin: 0;
-  padding: 16px;
+  padding: 18px;
   color: var(--muted);
   text-align: center;
 }
 
 .note {
-  margin-top: 16px;
-  font-size: 12px;
+  margin-top: 20px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
+  .field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  input[type='text'],
+  input[type='url'],
+  input[type='password'],
+  select {
+    width: calc(100% - 2 * var(--p));
+  }
+
   .usage-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .segmented {
+    flex-wrap: wrap;
   }
 }
