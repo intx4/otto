@@ -4,6 +4,8 @@
 
 OttO is a Chrome extension that sorts the tabs in your window into Chrome tab groups by topic. It sends each tab's title and URL to an LLM provider you choose, then creates named, colored groups from the reply. It also lists duplicate tabs you can close.
 
+<p align="center"><img src="docs/popup.png" width="355" alt="The OttO popup in dark mode, with the Organize window, Collapse all and Expand all buttons, the Auto-organize switch and Recent activity"></p>
+
 ## What it does
 
 - **Organize this window.** Click the toolbar icon, then **Organize this window**. OttO regroups every non-pinned web page in the current window. New tab pages, `chrome://` pages and extension pages, OttO's own included, are never sent or moved. It sends the names of your existing groups to the model, so group names stay the same between runs. Tabs that fit no topic end up ungrouped.
