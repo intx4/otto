@@ -10,6 +10,7 @@ import {
 import { complete } from './llm.js';
 import { applyPlan } from './apply.js';
 import { loadSettings, isConfigured } from './settings.js';
+import { addUsage } from './usage.js';
 
 const DEBOUNCE_MS = 3000;
 const SAMPLES_PER_GROUP = 3;
@@ -88,7 +89,7 @@ async function execute(windowId, kind) {
     }
 
     const { plan, applied } = await withSpinner(async () => {
-      const raw = await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA });
+      const raw = await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA }, { onUsage: (usage) => recordUsage(sourceOf(settings), usage) });
       const plan = parsePlan(raw, prompt);
       const assigned = new Set(plan.groups.flatMap((g) => g.tabIds));
       const ungroupTabIds =
@@ -115,6 +116,20 @@ async function execute(windowId, kind) {
     await logActivity({ kind, message: `Failed: ${message}` });
     return await finish(windowId, { ok: false, message });
   }
+}
+
+// The service worker is the only writer of usage, and writes one at a time so runs in parallel windows never lose a count.
+let usageWrites = Promise.resolve();
+
+const sourceOf = (settings) => ({ provider: settings.provider, model: settings.providers[settings.provider].model });
+
+function recordUsage({ provider, model }, usage) {
+  const entry = { at: Date.now(), provider, model, usage };
+  usageWrites = usageWrites.then(async () => {
+    const { usage: buckets = {} } = await chrome.storage.local.get('usage');
+    await chrome.storage.local.set({ usage: addUsage(buckets, entry) });
+  }).catch(() => {});
+  return usageWrites;
 }
 
 async function logActivity(entry) {
@@ -228,6 +243,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 });
 
 const HANDLERS = {
+  recordUsage: ({ source, usage }) => recordUsage(source, usage),
   organize: ({ windowId }) => requestRun(windowId, 'full'),
   getState: async ({ windowId }) => {
     const settings = await loadSettings();

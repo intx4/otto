@@ -48,8 +48,8 @@ const server = http.createServer((req, res) => {
     }
     const plan = JSON.stringify(cannedPlan(payload.messages.find((m) => m.role === 'user').content));
     res.setHeader('content-type', 'application/json');
-    if (req.url.endsWith('/v1/messages')) return res.end(JSON.stringify({ content: [{ type: 'text', text: plan }], stop_reason: 'end_turn' }));
-    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '```json\n' + plan + '\n```' } }] }));
+    if (req.url.endsWith('/v1/messages')) return res.end(JSON.stringify({ content: [{ type: 'text', text: plan }], stop_reason: 'end_turn', usage: { input_tokens: 200, output_tokens: 40 } }));
+    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '```json\n' + plan + '\n```' } }], usage: { prompt_tokens: 150, completion_tokens: 30, prompt_tokens_details: { cached_tokens: 50 } } }));
   });
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -365,6 +365,20 @@ try {
   assert.equal(saved.providers.bedrock.apiKey, 'bedrock-api-key');
   assert.equal(saved.apiKey, undefined);
   console.log('PASS options page shows per-provider fields and saves the nested shape');
+
+  await page.goto(`chrome-extension://${extensionId}/options/options.html#usage`);
+  await page.waitForSelector('#view-usage:not([hidden]) #usage-table tbody tr');
+  await page.click('#period button[data-days=""]');
+  await page.waitForFunction(() => document.querySelectorAll('#usage-table tbody tr').length === 3);
+  const usageRows = await page.$$eval('#usage-table tbody tr', (rows) => rows.map((r) => [r.querySelector('.provider').textContent, r.querySelector('.model').textContent, ...[...r.cells].slice(1).map((c) => c.textContent)]));
+  const okRuns = requests.filter((r) => !r.url.startsWith('/broken/'));
+  const openaiRuns = okRuns.filter((r) => r.url.endsWith('/chat/completions')).length;
+  const openaiRow = usageRows.find((r) => r[0] === 'OpenAI-compatible');
+  assert.deepEqual(openaiRow.slice(2), [openaiRuns, openaiRuns * 100, openaiRuns * 30, openaiRuns * 50, 0].map((n) => n.toLocaleString()));
+  assert.deepEqual(usageRows.map((r) => r[0]).sort(), ['Amazon Bedrock (Claude)', 'Anthropic', 'OpenAI-compatible']);
+  assert.equal(await page.$eval('#t-calls', (el) => el.textContent), String(okRuns.length));
+  assert.equal(await page.$$eval('#chart .bar', (bars) => bars.length), 1, "today's bar is drawn");
+  console.log(`PASS usage page totals ${okRuns.length} requests by provider and model, with cached tokens`);
 } catch (err) {
   failed = true;
   console.error('FAIL', err);

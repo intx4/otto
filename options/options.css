@@ -163,3 +163,235 @@ footer .status {
     width: 100%;
   }
 }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: -12px 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs a {
+  padding: 8px 10px;
+  margin-bottom: -1px;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs a:hover {
+  color: var(--text);
+}
+
+.tabs a[aria-current='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.usage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 28px 0 12px;
+}
+
+.usage-head h2 {
+  margin: 0;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.segmented button {
+  height: 24px;
+  padding: 0 10px;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow), 0 0 0 1px var(--border-strong);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.tile span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tile strong {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-card {
+  position: relative;
+  padding: 14px 16px 10px;
+}
+
+.chart-title {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+#chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  stroke: none;
+}
+
+#chart .bar {
+  fill: var(--accent);
+  pointer-events: none;
+}
+
+#chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+#chart .baseline {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+#chart .axis {
+  fill: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+#chart .hit {
+  fill: transparent;
+}
+
+#chart .hit:hover {
+  fill: var(--hover);
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 1;
+  min-width: 180px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.tt-head {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.card:has(table) {
+  overflow-x: auto;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+td:first-child {
+  max-width: 220px;
+}
+
+td .model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td .provider {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .usage-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

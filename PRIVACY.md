@@ -19,7 +19,7 @@ The provider receives this data under its own privacy policy. Anthropic, Amazon 
 
 ## Data OttO stores
 
-OttO stores your settings, including API keys and, if you use Amazon Bedrock with access keys, your AWS access key ID, secret access key and session token, in `chrome.storage.local` on your device. Chrome does not sync this storage. OttO does not encrypt it, so anyone with access to your browser profile can read these credentials. OttO keeps the result of the last run and the duplicate suggestions in `chrome.storage.session`, which Chrome clears when the browser closes.
+OttO stores your settings, including API keys and, if you use Amazon Bedrock with access keys, your AWS access key ID, secret access key and session token, in `chrome.storage.local` on your device. Chrome does not sync this storage. OttO does not encrypt it, so anyone with access to your browser profile can read these credentials. OttO also stores daily totals of the tokens and requests each provider reported, per provider and model, in `chrome.storage.local` for up to 400 days, to show them on the options page. OttO keeps the result of the last run and the duplicate suggestions in `chrome.storage.session`, which Chrome clears when the browser closes.
 
 ## Data OttO does not collect
 

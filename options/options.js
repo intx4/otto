@@ -96,7 +96,8 @@ $('test').addEventListener('click', async () => {
       maxGroups: 0,
       sendFullUrls: false,
     });
-    const plan = parsePlan(await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA }), prompt);
+    const onUsage = (usage) => chrome.runtime.sendMessage({ type: 'recordUsage', source: { provider: settings.provider, model: settings.providers[settings.provider].model }, usage });
+    const plan = parsePlan(await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA }, { onUsage }), prompt);
     const names = plan.groups.map((g) => `"${g.name}"`).join(', ') || 'no groups';
     setStatus(`Connected. The model replied with ${names}.`, 'ok');
   } catch (err) {

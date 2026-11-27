@@ -35,6 +35,18 @@ const messagesBody = ({ model }, { system, user, schema }) => ({
   thinking: { type: 'disabled' },
 });
 
+// Token counts in one shape: `input` excludes cached tokens, which are counted in cacheRead and cacheWrite.
+const count = (n) => (Number.isFinite(n) ? n : 0);
+
+function messagesUsage({ usage = {} }) {
+  return {
+    input: count(usage.input_tokens),
+    output: count(usage.output_tokens),
+    cacheRead: count(usage.cache_read_input_tokens),
+    cacheWrite: count(usage.cache_creation_input_tokens),
+  };
+}
+
 function readMessages(data) {
   if (data.stop_reason === 'refusal') throw new LlmError('The model declined this request.');
   if (data.stop_reason === 'max_tokens') throw new LlmError('The reply was cut off (too many tabs?).');
@@ -62,6 +74,7 @@ export const PROVIDERS = {
     }),
     body: messagesBody,
     read: readMessages,
+    usage: messagesUsage,
   },
   bedrock: {
     label: 'Amazon Bedrock (Claude)',
@@ -78,6 +91,7 @@ export const PROVIDERS = {
     },
     body: messagesBody,
     read: readMessages,
+    usage: messagesUsage,
   },
   openai: {
     label: 'OpenAI-compatible',
@@ -104,6 +118,10 @@ export const PROVIDERS = {
       if (message?.refusal) throw new LlmError(`The model declined: ${message.refusal}`);
       return extractJson(message?.content);
     },
+    usage: ({ usage = {} }) => {
+      const cached = count(usage.prompt_tokens_details?.cached_tokens);
+      return { input: Math.max(0, count(usage.prompt_tokens) - cached), output: count(usage.completion_tokens), cacheRead: cached, cacheWrite: 0 };
+    },
   },
 };
 
@@ -128,7 +146,8 @@ async function send(provider, config, url, payload) {
   }
 }
 
-export async function complete(settings, request) {
+// `onUsage` receives the reply's token counts as soon as it arrives, even when the reply is then rejected.
+export async function complete(settings, request, { onUsage } = {}) {
   const provider = PROVIDERS[settings.provider];
   if (!provider) throw new LlmError(`Unknown provider "${settings.provider}".`);
   const config = settings.providers[settings.provider];
@@ -152,6 +171,7 @@ export async function complete(settings, request) {
   } catch {
     throw new LlmError('The provider returned a response that is not JSON.');
   }
+  await onUsage?.(provider.usage(data));
   const result = provider.read(data);
   if (!result || typeof result !== 'object') throw new LlmError('The model reply did not contain a JSON plan.');
   return result;

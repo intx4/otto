@@ -90,3 +90,26 @@ test('a 400 unrelated to thinking is reported without a retry', async () => {
   await assert.rejects(complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k' } } }), request), { message: 'HTTP 400: model not found' });
   assert.equal(count, 1);
 });
+
+test('onUsage gets token counts in one shape for messages and OpenAI-compatible replies', async () => {
+  const seen = [];
+  const onUsage = (usage) => seen.push(usage);
+  capture({ ...messagesReply, usage: { input_tokens: 120, output_tokens: 30, cache_read_input_tokens: 400, cache_creation_input_tokens: 10 } });
+  await complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k' } } }), request, { onUsage });
+  capture({ choices: [{ message: { content: JSON.stringify(plan) } }], usage: { prompt_tokens: 500, completion_tokens: 25, prompt_tokens_details: { cached_tokens: 384 } } });
+  await complete(normalizeSettings({ provider: 'openai' }), request, { onUsage });
+  capture({ choices: [{ message: { content: JSON.stringify(plan) } }] });
+  await complete(normalizeSettings({ provider: 'openai' }), request, { onUsage });
+  assert.deepEqual(seen, [
+    { input: 120, output: 30, cacheRead: 400, cacheWrite: 10 },
+    { input: 116, output: 25, cacheRead: 384, cacheWrite: 0 },
+    { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  ]);
+});
+
+test('onUsage still runs when the reply is then rejected', async () => {
+  const seen = [];
+  capture({ content: [], stop_reason: 'max_tokens', usage: { input_tokens: 9, output_tokens: 16000 } });
+  await assert.rejects(complete(normalizeSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'k' } } }), request, { onUsage: (x) => seen.push(x) }), /cut off/);
+  assert.deepEqual(seen, [{ input: 9, output: 16000, cacheRead: 0, cacheWrite: 0 }]);
+});
