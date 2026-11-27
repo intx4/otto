@@ -15,9 +15,6 @@ const SAMPLES_PER_GROUP = 3;
 const MAX_UNGROUPED = 40;
 const BLANK_URL = /^(chrome:\/\/(newtab|new-tab-page)\/?|about:blank|chrome-search:\/\/)/;
 
-// Tabs created but not yet loaded with real content, and loaded tabs waiting for the next auto run.
-const pendingTabs = new Set();
-const freshTabs = new Map();
 const debounceTimers = new Map();
 
 // Per-window run lock. A request arriving while a run is in flight is queued once;
@@ -59,13 +56,10 @@ function prepare(kind, windowId, tabs, groups, settings) {
   if (kind === 'full') {
     return { tabsToSend: tabs, prompt: buildFullPrompt({ ...options, tabs, existingGroupTitles: groups.map((g) => g.title) }) };
   }
-  const fresh = freshTabs.get(windowId) ?? new Set();
-  freshTabs.delete(windowId);
-  // Earlier ungrouped tabs ride along so a new tab can start a group with one that arrived in a previous run.
-  const ungrouped = tabs.filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
-  if (!ungrouped.some((t) => fresh.has(t.id))) return { tabsToSend: [] };
-  const newTabs = ungrouped
-    .sort((a, b) => Number(fresh.has(b.id)) - Number(fresh.has(a.id)) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+  // Every ungrouped tab is a candidate, so a tab can start a group with one that loaded in an earlier run.
+  const newTabs = tabs
+    .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !BLANK_URL.test(t.url ?? ''))
+    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
     .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
   return { tabsToSend: newTabs, prompt: buildIncrementalPrompt({ ...options, newTabs, groups: withSamples }) };
@@ -80,6 +74,12 @@ async function execute(windowId, kind) {
     const groups = await chrome.tabGroups.query({ windowId });
     const { tabsToSend, prompt } = prepare(kind, windowId, tabs, groups, settings);
     if (tabsToSend.length === 0) return { ok: true, message: 'Nothing new to organize.', skipped: true };
+    // Skip an auto run when the ungrouped tabs are exactly the ones the model already declined to group.
+    const sentKey = `lastSent:${windowId}`;
+    const signature = tabsToSend.map((t) => `${t.id} ${t.url}`).sort().join('\n');
+    if (kind === 'incremental' && (await chrome.storage.session.get(sentKey))[sentKey] === signature) {
+      return { ok: true, message: 'Nothing new to organize.', skipped: true };
+    }
 
     const raw = await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA });
     const plan = parsePlan(raw, prompt);
@@ -88,6 +88,7 @@ async function execute(windowId, kind) {
     const ungroupTabIds =
       kind === 'full' ? tabs.filter((t) => t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && !assigned.has(t.id)).map((t) => t.id) : [];
     const applied = await applyPlan(windowId, plan, { existingGroups: groups, ungroupTabIds });
+    await chrome.storage.session.set({ [sentKey]: signature });
 
     await chrome.storage.session.set({ [`llmDuplicates:${windowId}`]: plan.duplicateClusters });
     const duplicates = await duplicatesFor(windowId);
@@ -137,19 +138,12 @@ function scheduleAuto(windowId) {
   );
 }
 
-chrome.tabs.onCreated.addListener((tab) => pendingTabs.add(tab.id));
-
-chrome.tabs.onRemoved.addListener((tabId) => pendingTabs.delete(tabId));
-
-chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
-  if (info.status !== 'complete' || !pendingTabs.has(tabId) || BLANK_URL.test(tab.url ?? '')) return;
-  pendingTabs.delete(tabId);
-  if (tab.pinned) return;
+// Stateless trigger: any ungrouped tab finishing a page load schedules an auto run for its window.
+// Holding no per-tab state means nothing is lost when Chrome stops the idle service worker.
+chrome.tabs.onUpdated.addListener(async (_tabId, info, tab) => {
+  if (info.status !== 'complete' || tab.pinned || tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || BLANK_URL.test(tab.url ?? '')) return;
   const settings = await loadSettings();
   if (!settings.autoOrganize || !isConfigured(settings)) return;
-  const fresh = freshTabs.get(tab.windowId) ?? new Set();
-  fresh.add(tabId);
-  freshTabs.set(tab.windowId, fresh);
   scheduleAuto(tab.windowId);
 });
 

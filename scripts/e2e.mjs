@@ -14,7 +14,7 @@ const inflight = { now: 0, max: 0 };
 
 // The mock groups every numbered tab line by the first path segment of its URL and, like the real
 // prompt rule, never starts a new group with a single tab.
-const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' }, pillows: { name: 'Pillows', color: 'blue' } };
+const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' }, pillows: { name: 'Pillows', color: 'blue' }, cuscini: { name: 'Cuscini', color: 'purple' } };
 
 function cannedPlan(userText) {
   const groups = {};
@@ -153,6 +153,21 @@ try {
   await openAndSettle('/pillows/2');
   assert.deepEqual((await snapshot(windowId)).find((g) => g.title === 'Pillows')?.paths, ['/pillows/1', '/pillows/2']);
   console.log('PASS two same-topic tabs opened in separate auto runs end up grouped together');
+
+  const before2 = requests.length;
+  const misc = await ext(async ({ windowId, url }) => (await chrome.tabs.create({ windowId, url, active: false })).id, { windowId, url: `${origin}/misc/1` });
+  await new Promise((r) => setTimeout(r, 6000));
+  await openAndSettle('/cuscini/1');
+  await ext(async ({ id, url }) => chrome.tabs.update(id, { url }), { id: misc, url: `${origin}/cuscini/2` });
+  await new Promise((r) => setTimeout(r, 6000));
+  assert.deepEqual((await snapshot(windowId)).find((g) => g.title === 'Cuscini')?.paths, ['/cuscini/1', '/cuscini/2']);
+  console.log('PASS a tab that navigates to a new page in place is grouped with a matching tab');
+
+  const settled = requests.length;
+  await ext(async ({ id, url }) => chrome.tabs.update(id, { url }), { id: misc, url: `${origin}/cuscini/2` });
+  await new Promise((r) => setTimeout(r, 6000));
+  assert.equal(requests.length, settled, 'a reload of a grouped tab sends nothing');
+  assert.ok(requests.length - before2 >= 2);
 
   const beforeBurst = requests.length;
   inflight.max = 0;
