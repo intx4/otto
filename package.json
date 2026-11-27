@@ -1,0 +1,8 @@
+{
+  "name": "otto-organizer-of-tabs-too-overpowered",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
