@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node --test",
     "check": "node scripts/check-extension.mjs",
-    "icons": "python3 scripts/make_icons.py",
+    "icons": "scripts/make-icons.sh",
     "e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {
