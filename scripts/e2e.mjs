@@ -1,11 +1,12 @@
 // End-to-end smoke test: loads the unpacked extension into Chrome for Testing (via puppeteer),
-// points it at a local OpenAI-compatible mock, and checks that real tab groups appear.
+// points it at a local mock that speaks the OpenAI and Anthropic Messages APIs, and checks that real tab groups appear.
 // Run: npm run e2e   (set HEADFUL=1 to watch)
 import http from 'node:http';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { signV4 } from '../src/sigv4.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const requests = [];
@@ -25,7 +26,7 @@ function cannedPlan(userText) {
 
 const server = http.createServer((req, res) => {
   res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-headers', '*');
+  res.setHeader('access-control-allow-headers', req.headers['access-control-request-headers'] ?? '*');
   if (req.method === 'OPTIONS') return res.end();
   if (req.method === 'GET') {
     res.setHeader('content-type', 'text/html');
@@ -35,7 +36,7 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', async () => {
     const payload = JSON.parse(body);
-    requests.push({ url: req.url, payload });
+    requests.push({ url: req.url, headers: req.headers, body, payload });
     inflight.max = Math.max(inflight.max, ++inflight.now);
     await new Promise((r) => setTimeout(r, 300));
     inflight.now -= 1;
@@ -43,9 +44,10 @@ const server = http.createServer((req, res) => {
       res.statusCode = 500;
       return res.end(JSON.stringify({ error: { message: 'mock failure' } }));
     }
-    const user = payload.messages.find((m) => m.role === 'user').content;
+    const plan = JSON.stringify(cannedPlan(payload.messages.find((m) => m.role === 'user').content));
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '```json\n' + JSON.stringify(cannedPlan(user)) + '\n```' } }] }));
+    if (req.url.endsWith('/v1/messages')) return res.end(JSON.stringify({ content: [{ type: 'text', text: plan }], stop_reason: 'end_turn' }));
+    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '```json\n' + plan + '\n```' } }] }));
   });
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -73,14 +75,18 @@ try {
   await ext((s) => chrome.storage.local.set({ settings: s }), settings);
 
   const urls = ['/news/1', '/recipes/pasta', '/news/2', '/recipes/soup', '/news/1?utm_source=newsletter#top', '/misc/page'].map((p) => origin + p);
-  const windowId = await ext(async (urls) => (await chrome.windows.create({ url: urls })).id, urls);
-  await ext(async (windowId) => {
-    for (let i = 0; i < 50; i++) {
-      const tabs = await chrome.tabs.query({ windowId });
-      if (tabs.every((t) => t.status === 'complete')) return;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  }, windowId);
+  const openWindow = async () => {
+    const windowId = await ext(async (urls) => (await chrome.windows.create({ url: urls })).id, urls);
+    await ext(async (windowId) => {
+      for (let i = 0; i < 50; i++) {
+        const tabs = await chrome.tabs.query({ windowId });
+        if (tabs.every((t) => t.status === 'complete')) return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }, windowId);
+    return windowId;
+  };
+  const windowId = await openWindow();
 
   const result = await ext((windowId) => chrome.runtime.sendMessage({ type: 'organize', windowId }), windowId);
   console.log('organize result:', result.message);
@@ -95,11 +101,12 @@ try {
         .sort((a, b) => a.title.localeCompare(b.title));
     }, windowId);
 
-  assert.deepEqual(await snapshot(windowId), [
+  const EXPECTED_GROUPS = [
     { title: 'News', color: 'red', paths: ['/news/1', '/news/1', '/news/2'] },
     { title: 'Recipes', color: 'green', paths: ['/recipes/pasta', '/recipes/soup'] },
-  ]);
-  console.log('PASS manual organize created News and Recipes groups');
+  ];
+  assert.deepEqual(await snapshot(windowId), EXPECTED_GROUPS);
+  console.log('PASS manual organize created News and Recipes groups from legacy flat settings');
 
   const sent = requests.at(-1).payload.messages.find((m) => m.role === 'user').content;
   assert.ok(!sent.includes('utm_source'), 'query strings are not sent by default');
@@ -152,6 +159,87 @@ try {
   assert.match(failure.message, /HTTP 500.*mock failure/);
   assert.equal(await ext(() => chrome.action.getBadgeText({})), '!');
   console.log(`PASS provider error surfaced: "${failure.message}", badge "!"`);
+
+  const organizeWith = async (provider, config) => {
+    await ext((s) => chrome.storage.local.set({ settings: s }), { provider, providers: { [provider]: config }, autoOrganize: false });
+    const before = requests.length;
+    const windowId = await openWindow();
+    const result = await ext((windowId) => chrome.runtime.sendMessage({ type: 'organize', windowId }), windowId);
+    assert.equal(result.ok, true, `${provider} organize failed: ${result.message}`);
+    assert.deepEqual(await snapshot(windowId), EXPECTED_GROUPS);
+    const sentNow = requests.slice(before);
+    assert.equal(sentNow.length, 1);
+    return sentNow[0];
+  };
+
+  const anthropic = await organizeWith('anthropic', { apiKey: 'sk-ant-test', baseUrl: `${origin}/gateway/`, model: 'claude-haiku-5-5' });
+  assert.equal(anthropic.url, '/gateway/v1/messages');
+  assert.equal(anthropic.headers['x-api-key'], 'sk-ant-test');
+  assert.equal(anthropic.headers['anthropic-version'], '2026-10-21');
+  assert.equal(anthropic.payload.output_config.format.type, 'json_schema');
+  console.log('PASS anthropic via custom base URL hit /gateway/v1/messages with x-api-key and anthropic-version');
+
+  const sigv4 = await organizeWith('bedrock', {
+    auth: 'sigv4',
+    region: 'eu-central-1',
+    baseUrl: `${origin}/anthropic`,
+    accessKeyId: 'AKIDEXAMPLE',
+    secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
+    sessionToken: 'session-token-example',
+  });
+  assert.equal(sigv4.url, '/anthropic/v1/messages');
+  assert.match(
+    sigv4.headers.authorization,
+    /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/\d{8}\/eu-central-1\/bedrock-mantle\/aws4_request, SignedHeaders=anthropic-version;content-type;host;x-amz-date;x-amz-security-token, Signature=[0-9a-f]{64}$/,
+  );
+  assert.match(sigv4.headers['x-amz-date'], /^\d{8}T\d{6}Z$/);
+  assert.equal(sigv4.headers['x-amz-security-token'], 'session-token-example');
+  assert.equal(sigv4.payload.model, 'anthropic.claude-haiku-5-5');
+  const resigned = await signV4({
+    method: 'POST',
+    url: `http://${sigv4.headers.host}${sigv4.url}`,
+    headers: { 'anthropic-version': sigv4.headers['anthropic-version'], 'content-type': sigv4.headers['content-type'] },
+    body: sigv4.body,
+    region: 'eu-central-1',
+    service: 'bedrock-mantle',
+    accessKeyId: 'AKIDEXAMPLE',
+    secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
+    sessionToken: 'session-token-example',
+    now: new Date(sigv4.headers['x-amz-date'].replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z')),
+  });
+  assert.equal(sigv4.headers.authorization, resigned.authorization, 'signature matches the host, headers and body the server received');
+  console.log(`PASS bedrock SigV4 request signed: ${sigv4.headers.authorization.slice(0, 96)}...`);
+
+  const bearer = await organizeWith('bedrock', { auth: 'apiKey', apiKey: 'bedrock-api-key', baseUrl: `${origin}/anthropic` });
+  assert.equal(bearer.headers.authorization, 'Bearer bedrock-api-key');
+  assert.equal(bearer.headers['x-amz-date'], undefined);
+  const bedrockPopup = await browser.newPage();
+  await bedrockPopup.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+  await bedrockPopup.waitForSelector('#organize', { visible: true });
+  assert.equal(await bedrockPopup.$eval('#setup', (el) => el.hidden), true);
+  await bedrockPopup.close();
+  console.log('PASS bedrock API key mode sends Authorization: Bearer, popup shows the configured view');
+
+  await page.reload();
+  await page.waitForSelector('#provider');
+  const visibleFields = () => page.$$eval('[data-field]', (rows) => rows.filter((r) => !r.hidden).map((r) => r.dataset.field));
+  assert.deepEqual(await visibleFields(), ['region', 'baseUrl', 'auth', 'apiKey', 'model']);
+  assert.equal(await page.$eval('#baseUrl', (el) => el.placeholder), 'https://bedrock-mantle.us-east-1.api.aws/anthropic');
+  await page.select('#auth', 'sigv4');
+  assert.deepEqual(await visibleFields(), ['region', 'baseUrl', 'auth', 'accessKeyId', 'secretAccessKey', 'sessionToken', 'model']);
+  await page.select('#provider', 'anthropic');
+  assert.deepEqual(await visibleFields(), ['baseUrl', 'apiKey', 'model']);
+  assert.deepEqual(await page.$eval('#baseUrl', (el) => [el.value, el.placeholder]), ['', 'https://api.anthropic.com']);
+  await page.type('#apiKey', 'sk-ant-saved');
+  await page.click('button[type=submit]');
+  await page.waitForFunction(() => document.querySelector('#status').textContent === 'Saved.');
+  const saved = (await ext(() => chrome.storage.local.get('settings'))).settings;
+  assert.equal(saved.provider, 'anthropic');
+  assert.equal(saved.providers.anthropic.apiKey, 'sk-ant-saved');
+  assert.equal(saved.providers.bedrock.auth, 'sigv4');
+  assert.equal(saved.providers.bedrock.apiKey, 'bedrock-api-key');
+  assert.equal(saved.apiKey, undefined);
+  console.log('PASS options page shows per-provider fields and saves the nested shape');
 } catch (err) {
   failed = true;
   console.error('FAIL', err);
