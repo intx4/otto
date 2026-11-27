@@ -15,7 +15,7 @@ import { addUsage } from './usage.js';
 const DEBOUNCE_MS = 3000;
 const SAMPLES_PER_GROUP = 3;
 const MAX_UNGROUPED = 40;
-// Auto runs only consider web pages; new tab, chrome:// and extension pages (Otto's own included) stay put.
+// OttO only organizes web pages; new tab, chrome:// and extension pages (OttO's own included) are never sent or moved.
 const WEB_URL = /^(https?|file):/;
 
 const ACTIVITY_LIMIT = 20;
@@ -64,7 +64,7 @@ function prepare(kind, windowId, tabs, groups, settings) {
   }
   // Every ungrouped tab is a candidate, so a tab can start a group with one that loaded in an earlier run.
   const newTabs = tabs
-    .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && WEB_URL.test(t.url ?? ''))
+    .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)
     .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
     .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
@@ -76,7 +76,7 @@ async function execute(windowId, kind) {
     const settings = await loadSettings();
     if (!isConfigured(settings)) return await finish(windowId, { ok: false, message: 'Set up a provider and API key in Options first.' });
 
-    const tabs = await chrome.tabs.query({ windowId, pinned: false });
+    const tabs = (await chrome.tabs.query({ windowId, pinned: false })).filter((t) => WEB_URL.test(t.url ?? ''));
     const groups = await chrome.tabGroups.query({ windowId });
     const { tabsToSend, prompt } = prepare(kind, windowId, tabs, groups, settings);
     if (tabsToSend.length === 0) return { ok: true, message: 'Nothing new to organize.', skipped: true };

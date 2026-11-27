@@ -10,7 +10,7 @@ OttO sends the **title** and **URL** of tabs in a browser window to the LLM prov
 
 OttO sends tab data only in these cases:
 
-- You click **Organize this window** or press the keyboard shortcut. OttO sends the non-pinned tabs of that window.
+- You click **Organize this window** or press the keyboard shortcut. OttO sends the non-pinned web pages of that window. It never sends new tab pages, `chrome://` pages or extension pages.
 - **Auto-organize new tabs** is on and a new tab finishes loading. OttO sends the new tab and up to three tabs from each existing group in that window.
 
 By default OttO removes the query string and fragment from each URL before it sends it. If you turn on **Send full URLs**, OttO sends URLs unchanged.

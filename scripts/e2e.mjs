@@ -129,12 +129,20 @@ try {
   await popup.waitForSelector('#organize', { visible: true });
   assert.deepEqual(popupErrors, []);
   assert.equal(await popup.$eval('#setup', (el) => el.hidden), true);
-  const beforeClick = requests.length;
-  await popup.click('#organize');
-  await popup.waitForFunction(() => !document.querySelector('#organize').disabled && /^Organized/.test(document.querySelector('#status').textContent));
-  assert.equal(requests.length - beforeClick, 1, 'clicking Organize sends one model request');
   await popup.close();
-  console.log('PASS popup renders the configured view without errors, and its Organize button runs');
+  const ownTarget = browser.waitForTarget((t) => t.url().endsWith('/popup/popup.html'));
+  await ext(({ windowId, url }) => chrome.tabs.create({ windowId, url }), { windowId, url: `chrome-extension://${extensionId}/popup/popup.html` });
+  const ownPopup = await (await ownTarget).page();
+  await ownPopup.waitForSelector('#organize', { visible: true });
+  const beforeClick = requests.length;
+  await ownPopup.click('#organize');
+  await ownPopup.waitForFunction(() => !document.querySelector('#organize').disabled && /^Organized/.test(document.querySelector('#status').textContent));
+  assert.equal(requests.length - beforeClick, 1, 'clicking Organize sends one model request');
+  assert.ok(!requests.at(-1).body.includes('chrome-extension'), "OttO's own page is not sent to the model");
+  assert.equal(await ext(async (windowId) => (await chrome.tabs.query({ windowId, url: 'chrome-extension://*/*' }))[0].groupId, windowId), -1, "OttO's own page stays ungrouped");
+  await ownPopup.close();
+  await new Promise((r) => setTimeout(r, 500));
+  console.log("PASS popup renders the configured view without errors; its Organize button runs and leaves OttO's own page alone");
 
   await ext((s) => chrome.storage.local.set({ settings: { ...s, autoOrganize: true } }), settings);
   const before = requests.length;
