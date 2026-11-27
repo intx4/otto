@@ -140,7 +140,7 @@ export function buildFullPrompt({ tabs, existingGroupTitles, maxGroups, sendFull
   return { system: SYSTEM, user, tabIndex, movable: new Set(tabIndex.keys()) };
 }
 
-// Incremental: only the new tabs may be grouped; sample tabs of existing groups are indexed
+// Incremental: only the ungrouped tabs may be grouped; sample tabs of existing groups are indexed
 // so the model can flag a new tab as a near-duplicate of one, but they never move.
 export function buildIncrementalPrompt({ newTabs, groups, maxGroups, sendFullUrls }) {
   const tabIndex = new Map();
@@ -164,7 +164,7 @@ export function buildIncrementalPrompt({ newTabs, groups, maxGroups, sendFullUrl
   const user = [
     sections.length ? sections.join('\n\n') : 'There are no existing groups.',
     '',
-    `New tabs (only these may be placed in groups; put each in an existing group by its exact name, in a new group, or leave it out):`,
+    `Ungrouped tabs (only these may be placed in groups; put each in an existing group by its exact name, in a new group with other ungrouped tabs on the same topic, or leave it out):`,
     lines.join('\n'),
   ].join('\n') + maxGroupsLine(maxGroups);
   return { system: SYSTEM, user, tabIndex, movable };

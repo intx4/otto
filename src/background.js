@@ -12,6 +12,7 @@ import { loadSettings, isConfigured } from './settings.js';
 
 const DEBOUNCE_MS = 3000;
 const SAMPLES_PER_GROUP = 3;
+const MAX_UNGROUPED = 40;
 const BLANK_URL = /^(chrome:\/\/(newtab|new-tab-page)\/?|about:blank|chrome-search:\/\/)/;
 
 // Tabs created but not yet loaded with real content, and loaded tabs waiting for the next auto run.
@@ -60,7 +61,12 @@ function prepare(kind, windowId, tabs, groups, settings) {
   }
   const fresh = freshTabs.get(windowId) ?? new Set();
   freshTabs.delete(windowId);
-  const newTabs = tabs.filter((t) => fresh.has(t.id) && t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
+  // Earlier ungrouped tabs ride along so a new tab can start a group with one that arrived in a previous run.
+  const ungrouped = tabs.filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
+  if (!ungrouped.some((t) => fresh.has(t.id))) return { tabsToSend: [] };
+  const newTabs = ungrouped
+    .sort((a, b) => Number(fresh.has(b.id)) - Number(fresh.has(a.id)) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+    .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
   return { tabsToSend: newTabs, prompt: buildIncrementalPrompt({ ...options, newTabs, groups: withSamples }) };
 }

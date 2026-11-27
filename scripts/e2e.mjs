@@ -12,8 +12,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const requests = [];
 const inflight = { now: 0, max: 0 };
 
-// The mock groups every numbered tab line by the first path segment of its URL.
-const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' } };
+// The mock groups every numbered tab line by the first path segment of its URL and, like the real
+// prompt rule, never starts a new group with a single tab.
+const GROUPS = { news: { name: 'News', color: 'red' }, recipes: { name: 'Recipes', color: 'green' }, pillows: { name: 'Pillows', color: 'blue' } };
 
 function cannedPlan(userText) {
   const groups = {};
@@ -21,7 +22,8 @@ function cannedPlan(userText) {
     if (!GROUPS[path]) continue;
     (groups[path] ??= { ...GROUPS[path], tabs: [] }).tabs.push(Number(index));
   }
-  return { groups: Object.values(groups), duplicates: [] };
+  const keep = (g) => g.tabs.length > 1 || userText.includes(`Existing group ${JSON.stringify(g.name)}`);
+  return { groups: Object.values(groups).filter(keep), duplicates: [] };
 }
 
 const server = http.createServer((req, res) => {
@@ -141,6 +143,16 @@ try {
   assert.deepEqual(afterAuto.find((g) => g.title === 'News').paths, ['/news/1', '/news/1', '/news/2', '/news/3']);
   assert.equal(afterAuto.length, 2, 'auto run reused the existing group');
   console.log('PASS auto-organize placed the new tab into the existing News group');
+
+  const openAndSettle = async (path) => {
+    await ext(async ({ windowId, url }) => chrome.tabs.create({ windowId, url, active: false }), { windowId, url: `${origin}${path}` });
+    await new Promise((r) => setTimeout(r, 6000));
+  };
+  await openAndSettle('/pillows/1');
+  assert.equal((await snapshot(windowId)).some((g) => g.title === 'Pillows'), false, 'a lone new tab starts no group');
+  await openAndSettle('/pillows/2');
+  assert.deepEqual((await snapshot(windowId)).find((g) => g.title === 'Pillows')?.paths, ['/pillows/1', '/pillows/2']);
+  console.log('PASS two same-topic tabs opened in separate auto runs end up grouped together');
 
   const beforeBurst = requests.length;
   inflight.max = 0;

@@ -76,7 +76,7 @@ test('buildIncrementalPrompt only lets new tabs move', () => {
   });
   assert.equal(
     user,
-    'Existing group "Other":\n1. "Other" https://other.site/\n\nNew tabs (only these may be placed in groups; put each in an existing group by its exact name, in a new group, or leave it out):\n2. "New" https://new.site/a',
+    'Existing group "Other":\n1. "Other" https://other.site/\n\nUngrouped tabs (only these may be placed in groups; put each in an existing group by its exact name, in a new group with other ungrouped tabs on the same topic, or leave it out):\n2. "New" https://new.site/a',
   );
   assert.deepEqual([...tabIndex], [[1, 13], [2, 50]]);
   assert.deepEqual([...movable], [2]);
