@@ -15,19 +15,50 @@
           <select id="provider"></select>
         </label>
 
-        <label id="base-url-row">
-          Base URL
-          <input id="baseUrl" type="url" placeholder="https://api.openai.com/v1" />
-          <small>OpenAI, OpenRouter (https://openrouter.ai/api/v1), Ollama (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1). Otto asks for access to a custom host when you save.</small>
+        <label data-field="region">
+          AWS region
+          <input id="region" type="text" spellcheck="false" placeholder="us-east-1" />
+          <small>Otto calls https://bedrock-mantle.&lt;region&gt;.api.aws/anthropic unless you set a base URL.</small>
         </label>
 
-        <label>
+        <label data-field="baseUrl">
+          Base URL
+          <input id="baseUrl" type="url" spellcheck="false" />
+          <small>Leave empty to use the default shown. Set it to reach the same API through a proxy or gateway (LiteLLM, Cloudflare AI Gateway), or another OpenAI-compatible server: OpenRouter (https://openrouter.ai/api/v1), Ollama (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1). Otto asks for access to a new host when you save.</small>
+        </label>
+
+        <label data-field="auth">
+          Authentication
+          <select id="auth">
+            <option value="apiKey">Bedrock API key</option>
+            <option value="sigv4">AWS access keys (SigV4)</option>
+          </select>
+          <small>Otto stores these credentials unencrypted in this browser profile. Prefer a Bedrock API key or short-lived credentials from an IAM user scoped to <code>bedrock-mantle:CreateInference</code>.</small>
+        </label>
+
+        <label data-field="apiKey">
           API key
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
           <small>Stored only on this device (chrome.storage.local). Never synced.</small>
         </label>
 
-        <label>
+        <label data-field="accessKeyId">
+          Access key ID
+          <input id="accessKeyId" type="text" autocomplete="off" spellcheck="false" />
+        </label>
+
+        <label data-field="secretAccessKey">
+          Secret access key
+          <input id="secretAccessKey" type="password" autocomplete="off" spellcheck="false" />
+        </label>
+
+        <label data-field="sessionToken">
+          Session token
+          <input id="sessionToken" type="password" autocomplete="off" spellcheck="false" />
+          <small>Optional. Needed only for temporary credentials.</small>
+        </label>
+
+        <label data-field="model">
           Model
           <input id="model" type="text" spellcheck="false" />
         </label>

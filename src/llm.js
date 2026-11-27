@@ -1,4 +1,5 @@
 import { extractJson } from './plan.js';
+import { signV4 } from './sigv4.js';
 
 export class LlmError extends Error {}
 
@@ -18,42 +19,69 @@ async function httpError(res) {
   return new LlmError(`HTTP ${res.status}${hint ? ` (${hint})` : ''}${detail ? `: ${detail}` : ''}`);
 }
 
-// Each provider turns {system, user, schema} into a fetch request and pulls the JSON object out of the reply.
+const ANTHROPIC_VERSION = '2026-10-21';
+
+const messagesBody = ({ model }, { system, user, schema }) => ({
+  model,
+  max_tokens: 16000,
+  system,
+  messages: [{ role: 'user', content: user }],
+  output_config: { format: { type: 'json_schema', schema } },
+});
+
+function readMessages(data) {
+  if (data.stop_reason === 'refusal') throw new LlmError('The model declined this request.');
+  if (data.stop_reason === 'max_tokens') throw new LlmError('The reply was cut off (too many tabs?).');
+  const text = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  return extractJson(text);
+}
+
+// Each provider owns a config (its `defaults` keys), turns {system, user, schema} into a request body,
+// builds headers from the final URL and serialized body, and pulls the JSON object out of the reply.
+// `fields` lists the config keys the options page shows; `missing` names a required credential that is empty.
 export const PROVIDERS = {
   anthropic: {
     label: 'Anthropic',
-    defaultModel: 'claude-haiku-5-5',
-    needsKey: true,
-    endpoint: () => 'https://api.anthropic.com/v1/messages',
-    headers: ({ apiKey }) => ({
+    defaults: { baseUrl: '', apiKey: '', model: 'claude-haiku-5-5' },
+    defaultBaseUrl: () => 'https://api.anthropic.com',
+    path: '/v1/messages',
+    fields: () => ['baseUrl', 'apiKey', 'model'],
+    missing: (c) => (c.apiKey ? '' : 'API key'),
+    headers: async (c) => ({
       'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2026-10-21',
+      'x-api-key': c.apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true',
     }),
-    body: ({ model }, { system, user, schema }) => ({
-      model,
-      max_tokens: 16000,
-      system,
-      messages: [{ role: 'user', content: user }],
-      output_config: { format: { type: 'json_schema', schema } },
-    }),
-    read: (data) => {
-      if (data.stop_reason === 'refusal') throw new LlmError('The model declined this request.');
-      if (data.stop_reason === 'max_tokens') throw new LlmError('The reply was cut off (too many tabs?).');
-      const text = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-      return extractJson(text);
+    body: messagesBody,
+    read: readMessages,
+  },
+  bedrock: {
+    label: 'Amazon Bedrock (Claude)',
+    defaults: { region: 'us-east-1', baseUrl: '', auth: 'apiKey', apiKey: '', accessKeyId: '', secretAccessKey: '', sessionToken: '', model: 'anthropic.claude-haiku-5-5' },
+    defaultBaseUrl: (c) => `https://bedrock-mantle.${c.region || 'us-east-1'}.api.aws/anthropic`,
+    path: '/v1/messages',
+    fields: (c) => ['region', 'baseUrl', 'auth', ...(c.auth === 'sigv4' ? ['accessKeyId', 'secretAccessKey', 'sessionToken'] : ['apiKey']), 'model'],
+    missing: (c) => (c.auth === 'sigv4' ? (c.accessKeyId && c.secretAccessKey ? '' : 'AWS access key') : c.apiKey ? '' : 'Bedrock API key'),
+    headers: async (c, { url, body }) => {
+      const headers = { 'content-type': 'application/json', 'anthropic-version': ANTHROPIC_VERSION };
+      if (c.auth !== 'sigv4') return { ...headers, authorization: `Bearer ${c.apiKey}` };
+      const { accessKeyId, secretAccessKey, sessionToken } = c;
+      return signV4({ method: 'POST', url, headers, body, region: c.region || 'us-east-1', service: 'bedrock-mantle', accessKeyId, secretAccessKey, sessionToken });
     },
+    body: messagesBody,
+    read: readMessages,
   },
   openai: {
     label: 'OpenAI-compatible',
-    defaultModel: 'gpt-4.1-mini',
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    needsKey: false,
-    endpoint: ({ baseUrl }) => `${trimSlash(baseUrl) || 'https://api.openai.com/v1'}/chat/completions`,
-    headers: ({ apiKey }) => ({
+    defaults: { baseUrl: '', apiKey: '', model: 'gpt-4.1-mini' },
+    defaultBaseUrl: () => 'https://api.openai.com/v1',
+    path: '/chat/completions',
+    fields: () => ['baseUrl', 'apiKey', 'model'],
+    missing: () => '',
+    headers: async (c) => ({
       'content-type': 'application/json',
-      ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+      ...(c.apiKey ? { authorization: `Bearer ${c.apiKey}` } : {}),
     }),
     body: ({ model }, { system, user, schema }) => ({
       model,
@@ -71,18 +99,24 @@ export const PROVIDERS = {
   },
 };
 
+export const baseUrlFor = (provider, config) => trimSlash(config.baseUrl) || provider.defaultBaseUrl(config);
+
 export async function complete(settings, request) {
   const provider = PROVIDERS[settings.provider];
   if (!provider) throw new LlmError(`Unknown provider "${settings.provider}".`);
-  if (provider.needsKey && !settings.apiKey) throw new LlmError('No API key set. Open Options to add one.');
-  if (!settings.model) throw new LlmError('No model set. Open Options to choose one.');
+  const config = settings.providers[settings.provider];
+  const missing = provider.missing(config);
+  if (missing) throw new LlmError(`No ${missing} set. Open Options to add one.`);
+  if (!config.model) throw new LlmError('No model set. Open Options to choose one.');
 
+  const url = baseUrlFor(provider, config) + provider.path;
+  const body = JSON.stringify(provider.body(config, request));
   let res;
   try {
-    res = await fetch(provider.endpoint(settings), {
+    res = await fetch(url, {
       method: 'POST',
-      headers: provider.headers(settings),
-      body: JSON.stringify(provider.body(settings, request)),
+      headers: await provider.headers(config, { url, body }),
+      body,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
