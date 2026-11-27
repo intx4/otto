@@ -164,3 +164,13 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.row button {
+  flex: 1;
+}

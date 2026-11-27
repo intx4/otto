@@ -188,6 +188,32 @@ try {
   assert.deepEqual(regrouped.find((g) => g.title === 'News')?.paths, ['/news/1', '/news/1']);
   console.log('PASS manual organize moves edited grouped tabs into an existing group or a new one');
 
+  const collapsedState = () => ext(async (windowId) => (await chrome.tabGroups.query({ windowId })).map((g) => g.collapsed), windowId);
+  const activeGroupCollapse = await ext(async (windowId) => {
+    const group = (await chrome.tabGroups.query({ windowId }))[0];
+    const [first] = await chrome.tabs.query({ windowId, groupId: group.id });
+    await chrome.tabs.update(first.id, { active: true });
+    const outcome = await chrome.tabGroups.update(group.id, { collapsed: true }).then(() => 'ok', (e) => e.message);
+    const [active] = await chrome.tabs.query({ windowId, active: true });
+    const collapsed = (await chrome.tabGroups.get(group.id)).collapsed;
+    await chrome.tabGroups.update(group.id, { collapsed: false });
+    return { outcome, collapsed, activeMoved: active.id !== first.id };
+  }, windowId);
+  console.log('collapsing the active tab group:', activeGroupCollapse);
+  const popupTarget = browser.waitForTarget((t) => t.url().endsWith('/popup/popup.html'));
+  await ext(({ windowId, url }) => chrome.tabs.create({ windowId, url }), { windowId, url: `chrome-extension://${extensionId}/popup/popup.html` });
+  const groupPopup = await (await popupTarget).page();
+  await groupPopup.waitForSelector('#collapse-all', { visible: true });
+  await groupPopup.click('#collapse-all');
+  await new Promise((r) => setTimeout(r, 500));
+  assert.ok((await collapsedState()).every(Boolean), 'Collapse all closes every group');
+  await groupPopup.click('#expand-all');
+  await new Promise((r) => setTimeout(r, 500));
+  assert.ok((await collapsedState()).every((c) => !c), 'Expand all opens every group');
+  await groupPopup.close();
+  await new Promise((r) => setTimeout(r, 5000));
+  console.log('PASS popup Collapse all and Expand all toggle every group in the window');
+
   const beforeBurst = requests.length;
   inflight.max = 0;
   const burst = await ext(

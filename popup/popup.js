@@ -84,6 +84,11 @@ async function organize() {
   }
 }
 
+async function setAllCollapsed(collapsed) {
+  const groups = await chrome.tabGroups.query({ windowId });
+  await Promise.all(groups.map((g) => chrome.tabGroups.update(g.id, { collapsed }).catch(() => {})));
+}
+
 function openOptions(event) {
   event?.preventDefault();
   chrome.runtime.openOptionsPage();
@@ -99,6 +104,8 @@ renderDuplicates(state.duplicates);
 renderActivity(state.activity);
 
 $('organize').addEventListener('click', organize);
+$('collapse-all').addEventListener('click', () => setAllCollapsed(true));
+$('expand-all').addEventListener('click', () => setAllCollapsed(false));
 $('auto').addEventListener('change', (e) => saveSettings({ autoOrganize: e.target.checked }));
 $('options-link').addEventListener('click', openOptions);
 $('open-options').addEventListener('click', openOptions);
