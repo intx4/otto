@@ -1,66 +1,79 @@
-:root {
-  --bg: #ffffff;
-  --fg: #202124;
-  --muted: #5f6368;
-  --line: #dadce0;
-  --accent: #1a73e8;
-  --accent-fg: #ffffff;
-  --error: #d93025;
-  --ok: #188038;
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #202124;
-    --fg: #e8eaed;
-    --muted: #9aa0a6;
-    --line: #3c4043;
-    --accent: #8ab4f8;
-    --accent-fg: #202124;
-    --error: #f28b82;
-    --ok: #81c995;
-  }
-}
-
-[hidden] {
-  display: none !important;
-}
-
 body {
-  margin: 0;
-  padding: 24px 16px;
-  font: 14px/1.5 system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--fg);
+  padding: 48px 20px 64px;
 }
 
 main {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
 }
 
-form {
+header {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 600;
-}
-
-label.check {
-  flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  margin-bottom: 32px;
 }
 
-small {
-  font-weight: 400;
+.logo {
+  border-radius: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+h2 {
+  margin: 28px 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 16px;
+}
+
+.field + .field {
+  border-top: 1px solid var(--border);
+}
+
+.field.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta label {
+  font-weight: 500;
+}
+
+.meta p {
+  margin: 2px 0 0;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -69,55 +82,84 @@ input[type='url'],
 input[type='password'],
 input[type='number'],
 select {
+  flex: none;
+  width: 260px;
+  height: 30px;
+  padding: 0 10px;
   font: inherit;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: transparent;
-  color: var(--fg);
+  transition: border-color 0.12s;
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
+.field.stacked input {
+  width: 100%;
 }
 
-button {
-  font: inherit;
-  padding: 6px 14px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--fg);
+select {
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238a8f98' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 6.5 3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
   cursor: pointer;
 }
 
-button.primary {
-  background: var(--accent);
+input.narrow {
+  width: 80px;
+}
+
+input:hover,
+select:hover {
+  border-color: var(--faint);
+}
+
+input:focus-visible,
+select:focus-visible {
   border-color: var(--accent);
-  color: var(--accent-fg);
-  font-weight: 600;
 }
 
-#status.ok {
-  color: var(--ok);
+input::placeholder {
+  color: var(--faint);
 }
 
-#status.error {
-  color: var(--error);
-}
-
-.shortcut {
-  margin-top: 24px;
+#shortcut {
+  height: 22px;
+  padding: 0 8px;
+  opacity: 1;
   color: var(--muted);
+  border-color: var(--border-strong);
 }
 
-h1 {
+footer {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 12px 0;
+  background: var(--bg);
 }
 
-.logo {
-  border-radius: 8px;
+footer .status {
+  flex: 1;
+}
+
+@media (max-width: 560px) {
+  .field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  input[type='text'],
+  input[type='url'],
+  input[type='password'],
+  select {
+    width: 100%;
+  }
 }

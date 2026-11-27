@@ -1,6 +1,7 @@
 import { saveSettings } from '../src/settings.js';
 
 const $ = (id) => document.getElementById(id);
+const CLOSE_ICON = '<svg viewBox="0 0 16 16"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>';
 const { id: windowId } = await chrome.windows.getCurrent();
 
 function send(type, extra = {}) {
@@ -31,13 +32,17 @@ function renderDuplicates(duplicates) {
       title.textContent = tab.title || tab.url;
       title.title = `${tab.url}\nKeeping: ${keep.title || keep.url}`;
       const button = document.createElement('button');
-      button.textContent = 'Close';
+      button.className = 'ghost icon';
+      button.title = 'Close tab';
+      button.setAttribute('aria-label', `Close ${tab.title || tab.url}`);
+      button.innerHTML = CLOSE_ICON;
       button.addEventListener('click', () => closeTabs([tab.id]));
       li.append(title, button);
       list.append(li);
     }
   }
   $('duplicates').hidden = closeIds.length === 0;
+  $('dup-count').textContent = closeIds.length;
   $('close-all').onclick = () => closeTabs(closeIds);
 }
 
@@ -47,8 +52,16 @@ function renderActivity(activity) {
   for (const entry of activity) {
     const li = document.createElement('li');
     const head = document.createElement('div');
-    const when = new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    head.textContent = `${when} · ${entry.kind === 'full' ? 'Organize' : 'Auto'} · ${entry.message}`;
+    head.className = 'entry-head';
+    const time = document.createElement('time');
+    time.textContent = new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const kind = document.createElement('span');
+    kind.className = 'pill';
+    kind.textContent = entry.kind === 'full' ? 'Organize' : 'Auto';
+    const message = document.createElement('span');
+    message.className = 'message';
+    message.textContent = entry.message;
+    head.append(time, kind, message);
     li.append(head);
     for (const tab of entry.tabs ?? []) {
       const line = document.createElement('div');
@@ -102,6 +115,12 @@ showResult(state.lastResult);
 if (state.running) setStatus('Organizing...');
 renderDuplicates(state.duplicates);
 renderActivity(state.activity);
+
+const command = (await chrome.commands.getAll()).find((c) => c.name === 'organize-window');
+if (command?.shortcut) {
+  $('shortcut').textContent = command.shortcut;
+  $('shortcut').hidden = false;
+}
 
 $('organize').addEventListener('click', organize);
 $('collapse-all').addEventListener('click', () => setAllCollapsed(true));

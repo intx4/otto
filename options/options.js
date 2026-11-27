@@ -41,7 +41,7 @@ function readForm() {
 
 function setStatus(text, kind = '') {
   $('status').textContent = text;
-  $('status').className = kind;
+  $('status').className = `status ${kind}`;
 }
 
 // Hosts outside the manifest's host_permissions (Bedrock regions, gateways, Ollama, ...) need host access to bypass CORS.
@@ -107,3 +107,6 @@ $('test').addEventListener('click', async () => {
 $('provider').value = shown;
 for (const key of GENERAL) write($(key), draft[key]);
 showProvider(shown);
+
+const command = (await chrome.commands.getAll()).find((c) => c.name === 'organize-window');
+if (command?.shortcut) $('shortcut').textContent = command.shortcut;

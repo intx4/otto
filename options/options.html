@@ -5,89 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Otto Options</title>
     <link rel="icon" href="../icons/icon32.png" />
+    <link rel="stylesheet" href="../styles/base.css" />
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main>
-      <h1><img class="logo" src="../icons/icon128.png" alt="" width="40" height="40" />Otto options</h1>
-      <form id="form">
-        <label>
-          Provider
-          <select id="provider"></select>
-        </label>
-
-        <label data-field="region">
-          AWS region
-          <input id="region" type="text" spellcheck="false" placeholder="us-east-1" />
-          <small>Otto calls https://bedrock-mantle.&lt;region&gt;.api.aws/anthropic unless you set a base URL.</small>
-        </label>
-
-        <label data-field="baseUrl">
-          Base URL
-          <input id="baseUrl" type="url" spellcheck="false" />
-          <small>Leave empty to use the default shown. Set it to reach the same API through a proxy or gateway (LiteLLM, Cloudflare AI Gateway), or another OpenAI-compatible server: OpenRouter (https://openrouter.ai/api/v1), Ollama (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1). Otto asks for access to a new host when you save.</small>
-        </label>
-
-        <label data-field="auth">
-          Authentication
-          <select id="auth">
-            <option value="apiKey">Bedrock API key</option>
-            <option value="sigv4">AWS access keys (SigV4)</option>
-          </select>
-          <small>Otto stores these credentials unencrypted in this browser profile. Prefer a Bedrock API key or short-lived credentials from an IAM user scoped to <code>bedrock-mantle:CreateInference</code>.</small>
-        </label>
-
-        <label data-field="apiKey">
-          API key
-          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
-          <small>Stored only on this device (chrome.storage.local). Never synced.</small>
-        </label>
-
-        <label data-field="accessKeyId">
-          Access key ID
-          <input id="accessKeyId" type="text" autocomplete="off" spellcheck="false" />
-        </label>
-
-        <label data-field="secretAccessKey">
-          Secret access key
-          <input id="secretAccessKey" type="password" autocomplete="off" spellcheck="false" />
-        </label>
-
-        <label data-field="sessionToken">
-          Session token
-          <input id="sessionToken" type="password" autocomplete="off" spellcheck="false" />
-          <small>Optional. Needed only for temporary credentials.</small>
-        </label>
-
-        <label data-field="model">
-          Model
-          <input id="model" type="text" spellcheck="false" />
-        </label>
-
-        <label>
-          Max groups
-          <input id="maxGroups" type="number" min="0" max="30" />
-          <small>A hint for the model. 0 means no limit.</small>
-        </label>
-
-        <label class="check">
-          <input id="sendFullUrls" type="checkbox" />
-          Send full URLs
-        </label>
-        <small>Off: Otto sends only the origin and path (no query string or fragment). On: full URLs, which can help grouping but may include tokens or search terms.</small>
-
-        <label class="check">
-          <input id="autoOrganize" type="checkbox" />
-          Auto-organize new tabs
-        </label>
-
-        <div class="actions">
-          <button type="submit" class="primary">Save</button>
-          <button type="button" id="test">Test connection</button>
+      <header>
+        <img class="logo" src="../icons/icon128.png" alt="" width="36" height="36" />
+        <div>
+          <h1>Otto</h1>
+          <p>Organizer of Tabs Too Overpowered</p>
         </div>
-        <p id="status" role="status"></p>
+      </header>
+
+      <form id="form">
+        <h2>Model provider</h2>
+        <section class="card">
+          <div class="field">
+            <div class="meta"><label for="provider">Provider</label></div>
+            <select id="provider"></select>
+          </div>
+
+          <div class="field" data-field="region">
+            <div class="meta">
+              <label for="region">AWS region</label>
+              <p>Otto calls <code>bedrock-mantle.&lt;region&gt;.api.aws</code> unless you set a base URL.</p>
+            </div>
+            <input id="region" type="text" spellcheck="false" placeholder="us-east-1" />
+          </div>
+
+          <div class="field stacked" data-field="baseUrl">
+            <div class="meta">
+              <label for="baseUrl">Base URL</label>
+              <p>Leave empty for the default shown. Set it to go through a proxy or gateway (LiteLLM, Cloudflare AI Gateway), or another OpenAI-compatible server such as OpenRouter (<code>https://openrouter.ai/api/v1</code>), Ollama (<code>http://localhost:11434/v1</code>) or LM Studio (<code>http://localhost:1234/v1</code>). Otto asks for access to a new host when you save.</p>
+            </div>
+            <input id="baseUrl" type="url" spellcheck="false" />
+          </div>
+
+          <div class="field" data-field="auth">
+            <div class="meta">
+              <label for="auth">Authentication</label>
+              <p>Stored unencrypted in this browser profile. Prefer a Bedrock API key or short-lived credentials scoped to <code>bedrock-mantle:CreateInference</code>.</p>
+            </div>
+            <select id="auth">
+              <option value="apiKey">Bedrock API key</option>
+              <option value="sigv4">AWS access keys (SigV4)</option>
+            </select>
+          </div>
+
+          <div class="field" data-field="apiKey">
+            <div class="meta">
+              <label for="apiKey">API key</label>
+              <p>Stored only on this device, never synced.</p>
+            </div>
+            <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field" data-field="accessKeyId">
+            <div class="meta"><label for="accessKeyId">Access key ID</label></div>
+            <input id="accessKeyId" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field" data-field="secretAccessKey">
+            <div class="meta"><label for="secretAccessKey">Secret access key</label></div>
+            <input id="secretAccessKey" type="password" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field" data-field="sessionToken">
+            <div class="meta">
+              <label for="sessionToken">Session token</label>
+              <p>Optional. Only for temporary credentials.</p>
+            </div>
+            <input id="sessionToken" type="password" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="field" data-field="model">
+            <div class="meta"><label for="model">Model</label></div>
+            <input id="model" type="text" spellcheck="false" />
+          </div>
+        </section>
+
+        <h2>Grouping</h2>
+        <section class="card">
+          <div class="field">
+            <div class="meta">
+              <label for="autoOrganize">Auto-organize</label>
+              <p>Group new tabs as they finish loading.</p>
+            </div>
+            <input id="autoOrganize" type="checkbox" class="switch" />
+          </div>
+
+          <div class="field">
+            <div class="meta">
+              <label for="maxGroups">Max groups</label>
+              <p>A hint for the model. 0 means no limit.</p>
+            </div>
+            <input id="maxGroups" type="number" min="0" max="30" class="narrow" />
+          </div>
+
+          <div class="field">
+            <div class="meta">
+              <label for="sendFullUrls">Send full URLs</label>
+              <p>Off sends only the origin and path. On also sends query strings, which can help grouping but may include tokens or search terms.</p>
+            </div>
+            <input id="sendFullUrls" type="checkbox" class="switch" />
+          </div>
+
+          <div class="field">
+            <div class="meta">
+              <label>Keyboard shortcut</label>
+              <p>Organize the current window. Change it at <code>chrome://extensions/shortcuts</code>.</p>
+            </div>
+            <kbd id="shortcut">Not set</kbd>
+          </div>
+        </section>
+
+        <footer>
+          <p id="status" class="status" role="status"></p>
+          <button type="button" id="test">Test connection</button>
+          <button type="submit" class="primary">Save changes</button>
+        </footer>
       </form>
-      <p class="shortcut">Keyboard shortcut: set or change it at <code>chrome://extensions/shortcuts</code>.</p>
     </main>
     <script type="module" src="options.js"></script>
   </body>

@@ -17,7 +17,7 @@ const MAX_UNGROUPED = 40;
 const WEB_URL = /^(https?|file):/;
 
 const ACTIVITY_LIMIT = 20;
-const SPINNER_COLOR = '#1a73e8';
+const SPINNER_COLOR = '#77dd77';
 
 const debounceTimers = new Map();
 
