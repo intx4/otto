@@ -92,7 +92,7 @@ button.wide {
 }
 
 small {
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   font-weight: 400;
   color: var(--muted);
 }
@@ -162,7 +162,7 @@ details[open] .chevron {
   gap: 8px;
   height: 30px;
   padding: 0 2px 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .tabs-panel .list li:hover {
@@ -229,7 +229,7 @@ details[open] .chevron {
 
 #activity-list .outcome {
   margin: 4px 0 0 2px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   padding-left: 10px;
   border-left: var(--p) solid var(--line);
   color: var(--muted);
