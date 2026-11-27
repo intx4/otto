@@ -19,9 +19,6 @@ const ACTIVITY_LIMIT = 20;
 const SPINNER_COLOR = '#1a73e8';
 
 const debounceTimers = new Map();
-// Tabs whose load scheduled the pending auto run; they go first when the ungrouped list is capped.
-// Losing this to a service worker restart only loses that priority, not the run.
-const triggeredTabs = new Map();
 
 // Per-window run lock. A request arriving while a run is in flight is queued once;
 // a queued incremental run is upgraded to full if a full run is requested.
@@ -63,11 +60,9 @@ function prepare(kind, windowId, tabs, groups, settings) {
     return { tabsToSend: tabs, prompt: buildFullPrompt({ ...options, tabs, existingGroupTitles: groups.map((g) => g.title) }) };
   }
   // Every ungrouped tab is a candidate, so a tab can start a group with one that loaded in an earlier run.
-  const triggered = triggeredTabs.get(windowId) ?? new Set();
-  triggeredTabs.delete(windowId);
   const newTabs = tabs
     .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !BLANK_URL.test(t.url ?? ''))
-    .sort((a, b) => Number(triggered.has(b.id)) - Number(triggered.has(a.id)) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
     .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
   return { tabsToSend: newTabs, prompt: buildIncrementalPrompt({ ...options, newTabs, groups: withSamples }) };
@@ -198,8 +193,7 @@ async function duplicatesFor(windowId) {
   return resolved.map((d) => ({ keep: byId.get(d.keep), close: d.close.map((id) => byId.get(id)) }));
 }
 
-function scheduleAuto(windowId, tabId) {
-  triggeredTabs.set(windowId, (triggeredTabs.get(windowId) ?? new Set()).add(tabId));
+function scheduleAuto(windowId) {
   clearTimeout(debounceTimers.get(windowId));
   debounceTimers.set(
     windowId,
@@ -212,11 +206,11 @@ function scheduleAuto(windowId, tabId) {
 
 // Stateless trigger: any ungrouped tab finishing a page load schedules an auto run for its window.
 // Holding no per-tab state means nothing is lost when Chrome stops the idle service worker.
-chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+chrome.tabs.onUpdated.addListener(async (_tabId, info, tab) => {
   if (info.status !== 'complete' || tab.pinned || tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || BLANK_URL.test(tab.url ?? '')) return;
   const settings = await loadSettings();
   if (!settings.autoOrganize || !isConfigured(settings)) return;
-  scheduleAuto(tab.windowId, tabId);
+  scheduleAuto(tab.windowId);
 });
 
 chrome.commands.onCommand.addListener(async (command) => {
