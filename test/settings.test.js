@@ -25,6 +25,7 @@ test('normalizeSettings moves the flat shape into the selected provider', () => 
     sendFullUrls: true,
     maxGroups: 5,
     autoOrganize: false,
+    staleDays: 7,
   });
 });
 

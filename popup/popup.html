@@ -48,13 +48,27 @@
         <input type="checkbox" id="auto" class="switch" />
       </label>
 
-      <div id="duplicates" class="panel" hidden>
-        <div class="panel-head">
-          <h2>Duplicates <span id="dup-count" class="count"></span></h2>
-          <button id="close-all" class="ghost">Close all</button>
-        </div>
-        <ul id="dup-list" class="list"></ul>
-      </div>
+      <details id="duplicates" class="panel tabs-panel" open hidden>
+        <summary class="panel-head">
+          <h2>
+            <svg class="chevron" viewBox="0 0 16 16"><path d="m6 4 4 4-4 4" /></svg>
+            Duplicates <span id="duplicates-count" class="count"></span>
+          </h2>
+          <button id="duplicates-close-all" class="ghost">Close all</button>
+        </summary>
+        <ul id="duplicates-list" class="list"></ul>
+      </details>
+
+      <details id="stale" class="panel tabs-panel" open hidden>
+        <summary class="panel-head">
+          <h2>
+            <svg class="chevron" viewBox="0 0 16 16"><path d="m6 4 4 4-4 4" /></svg>
+            Stale tabs <span id="stale-count" class="count"></span>
+          </h2>
+          <button id="stale-close-all" class="ghost">Close all</button>
+        </summary>
+        <ul id="stale-list" class="list"></ul>
+      </details>
 
       <details id="activity" class="panel" hidden>
         <summary class="panel-head">

@@ -103,6 +103,17 @@ export function findExactDuplicateClusters(tabs) {
   return [...byUrl.values()].filter((ids) => ids.length > 1);
 }
 
+const DAY_MS = 86_400_000;
+
+// Tabs not used for at least `days` days, least recently used first. The active and pinned tabs are never stale.
+export function findStaleTabs(tabs, { days, now }) {
+  if (!(days > 0)) return [];
+  const cutoff = now - days * DAY_MS;
+  return tabs
+    .filter((t) => !t.active && !t.pinned && t.lastAccessed !== undefined && t.lastAccessed <= cutoff)
+    .sort((a, b) => a.lastAccessed - b.lastAccessed);
+}
+
 const SYSTEM = `You organize a web browser's tabs into tab groups by topic.
 You receive numbered tabs with their title and URL. Reply with JSON only, matching this shape:
 {"groups":[{"name":string,"color":string,"tabs":[number]}],"duplicates":[{"keep":number,"close":[number]}]}

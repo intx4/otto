@@ -4,6 +4,7 @@ import {
   buildIncrementalPrompt,
   parsePlan,
   findExactDuplicateClusters,
+  findStaleTabs,
   resolveDuplicates,
 } from './plan.js';
 import { complete } from './llm.js';
@@ -99,7 +100,7 @@ async function execute(windowId, kind) {
     const outcomes = tabsToSend.map((t) => ({ title: t.title || t.url, group: groupOf.get(t.id) ?? null }));
 
     await chrome.storage.session.set({ [`llmDuplicates:${windowId}`]: plan.duplicateClusters });
-    const duplicates = await duplicatesFor(windowId);
+    const { duplicates } = await cleanupFor(windowId);
     const closable = duplicates.reduce((n, d) => n + d.close.length, 0);
     const summary =
       kind === 'full'
@@ -185,13 +186,19 @@ async function finish(windowId, result) {
   return stamped;
 }
 
-async function duplicatesFor(windowId) {
-  const tabs = await chrome.tabs.query({ windowId, pinned: false });
+// Tabs Otto proposes to close in a window: duplicates of another tab, then stale tabs not already listed as duplicates.
+async function cleanupFor(windowId) {
+  const [tabs, settings] = await Promise.all([chrome.tabs.query({ windowId, pinned: false }), loadSettings()]);
   const key = `llmDuplicates:${windowId}`;
   const { [key]: llmClusters = [] } = await chrome.storage.session.get(key);
   const resolved = resolveDuplicates([...findExactDuplicateClusters(tabs), ...llmClusters], tabs);
   const byId = new Map(tabs.map((t) => [t.id, { id: t.id, title: t.title, url: t.url }]));
-  return resolved.map((d) => ({ keep: byId.get(d.keep), close: d.close.map((id) => byId.get(id)) }));
+  const duplicates = resolved.map((d) => ({ keep: byId.get(d.keep), close: d.close.map((id) => byId.get(id)) }));
+  const closing = new Set(resolved.flatMap((d) => d.close));
+  const stale = findStaleTabs(tabs, { days: Number(settings.staleDays) || 0, now: Date.now() })
+    .filter((t) => !closing.has(t.id))
+    .map((t) => ({ ...byId.get(t.id), lastAccessed: t.lastAccessed }));
+  return { duplicates, stale };
 }
 
 function scheduleAuto(windowId) {
@@ -233,15 +240,15 @@ const HANDLERS = {
       spinning: spinTimer !== null,
       activity: (await chrome.storage.session.get('activity')).activity ?? [],
       lastResult,
-      duplicates: await duplicatesFor(windowId),
+      ...(await cleanupFor(windowId)),
     };
   },
   closeTabs: async ({ windowId, tabIds }) => {
     await chrome.tabs.remove(tabIds);
-    const duplicates = await duplicatesFor(windowId);
-    const count = duplicates.reduce((n, d) => n + d.close.length, 0);
+    const cleanup = await cleanupFor(windowId);
+    const count = cleanup.duplicates.reduce((n, d) => n + d.close.length, 0);
     if ((await chrome.action.getBadgeText({})) !== '!') await chrome.action.setBadgeText({ text: count ? String(count) : '' });
-    return { duplicates };
+    return cleanup;
   },
 };
 

@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS = {
   sendFullUrls: false,
   maxGroups: 8,
   autoOrganize: true,
+  staleDays: 7,
 };
 
 // Fills defaults and moves the original flat shape ({provider, apiKey, model, baseUrl}) into providers[provider].

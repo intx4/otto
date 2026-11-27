@@ -4,7 +4,7 @@ import { PLAN_SCHEMA, buildFullPrompt, parsePlan } from '../src/plan.js';
 
 const $ = (id) => document.getElementById(id);
 const BUILT_IN_HOSTS = new Set(['api.anthropic.com', 'api.openai.com']);
-const GENERAL = ['maxGroups', 'sendFullUrls', 'autoOrganize'];
+const GENERAL = ['maxGroups', 'sendFullUrls', 'autoOrganize', 'staleDays'];
 
 for (const [id, provider] of Object.entries(PROVIDERS)) {
   $('provider').append(new Option(provider.label, id));

@@ -129,8 +129,12 @@ try {
   await popup.waitForSelector('#organize', { visible: true });
   assert.deepEqual(popupErrors, []);
   assert.equal(await popup.$eval('#setup', (el) => el.hidden), true);
+  const beforeClick = requests.length;
+  await popup.click('#organize');
+  await popup.waitForFunction(() => !document.querySelector('#organize').disabled && /^Organized/.test(document.querySelector('#status').textContent));
+  assert.equal(requests.length - beforeClick, 1, 'clicking Organize sends one model request');
   await popup.close();
-  console.log('PASS popup renders the configured view without errors');
+  console.log('PASS popup renders the configured view without errors, and its Organize button runs');
 
   await ext((s) => chrome.storage.local.set({ settings: { ...s, autoOrganize: true } }), settings);
   const before = requests.length;
@@ -252,6 +256,34 @@ try {
   assert.match(failure.message, /HTTP 500.*mock failure/);
   assert.equal(await ext(() => chrome.action.getBadgeText({})), '!');
   console.log(`PASS provider error surfaced: "${failure.message}", badge "!"`);
+
+  const { settings: stored } = await ext(() => chrome.storage.local.get('settings'));
+  await ext((s) => chrome.storage.local.set({ settings: s }), { ...stored, autoOrganize: false, staleDays: 2 / 86400 });
+  const staleWindow = await openWindow();
+  await new Promise((r) => setTimeout(r, 2500));
+  const stalePopupTarget = browser.waitForTarget((t) => t.url().endsWith('/popup/popup.html'));
+  await ext(({ windowId, url }) => chrome.tabs.create({ windowId, url }), { windowId: staleWindow, url: `chrome-extension://${extensionId}/popup/popup.html` });
+  const stalePopup = await (await stalePopupTarget).page();
+  await stalePopup.waitForSelector('#stale:not([hidden])');
+  const staleTitles = () => stalePopup.$$eval('#stale-list .title', (els) => els.map((e) => e.textContent).sort());
+  assert.deepEqual(await staleTitles(), ['/misc/page', '/news/1', '/news/2', '/recipes/pasta', '/recipes/soup']);
+  assert.equal(await stalePopup.$eval('#duplicates-count', (el) => el.textContent), '1', 'the duplicate is listed once, under Duplicates only');
+  await stalePopup.click('#stale summary h2');
+  assert.equal(await stalePopup.$eval('#stale', (el) => el.open), false);
+  await stalePopup.waitForFunction(() => localStorage.getItem('panel:stale') === 'closed');
+  await stalePopup.reload();
+  await stalePopup.waitForSelector('#stale:not([hidden])');
+  assert.equal(await stalePopup.$eval('#stale', (el) => el.open), false, 'a collapsed panel stays collapsed');
+  await stalePopup.click('#stale summary h2');
+  await stalePopup.click('#stale-list li:first-child button');
+  await stalePopup.waitForFunction(() => document.querySelectorAll('#stale-list li').length === 4);
+  await stalePopup.click('#stale-close-all');
+  await stalePopup.waitForFunction(() => document.querySelectorAll('#stale-list li').length === 1);
+  assert.deepEqual(await staleTitles(), ['/news/1'], 'with its keeper closed, the leftover duplicate is stale itself');
+  const left = await ext(async (windowId) => (await chrome.tabs.query({ windowId })).map((t) => new URL(t.url).pathname + new URL(t.url).search), staleWindow);
+  assert.deepEqual(left.sort(), ['/news/1?utm_source=newsletter', '/popup/popup.html']);
+  await ext(async (windowId) => chrome.windows.remove(windowId), staleWindow);
+  console.log('PASS stale tabs listed oldest first, closable one by one or all at once; panels collapse and remember it');
 
   const organizeWith = async (provider, config) => {
     await ext((s) => chrome.storage.local.set({ settings: s }), { provider, providers: { [provider]: config }, autoOrganize: false });

@@ -19,31 +19,66 @@ function showResult(result) {
   setStatus(result.ok ? `${result.message}${dupes}` : result.message, !result.ok);
 }
 
-function renderDuplicates(duplicates) {
-  const list = $('dup-list');
-  list.replaceChildren();
-  const closeIds = [];
-  for (const { keep, close } of duplicates) {
-    for (const tab of close) {
-      closeIds.push(tab.id);
-      const li = document.createElement('li');
-      const title = document.createElement('span');
-      title.className = 'title';
-      title.textContent = tab.title || tab.url;
-      title.title = `${tab.url}\nKeeping: ${keep.title || keep.url}`;
-      const button = document.createElement('button');
-      button.className = 'ghost icon';
-      button.title = 'Close tab';
-      button.setAttribute('aria-label', `Close ${tab.title || tab.url}`);
-      button.innerHTML = CLOSE_ICON;
-      button.addEventListener('click', () => closeTabs([tab.id]));
-      li.append(title, button);
-      list.append(li);
-    }
+function tabRow(tab, { tooltip, age }) {
+  const li = document.createElement('li');
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = tab.title || tab.url;
+  title.title = tooltip;
+  li.append(title);
+  if (age) {
+    const when = document.createElement('span');
+    when.className = 'age';
+    when.textContent = age;
+    li.append(when);
   }
-  $('duplicates').hidden = closeIds.length === 0;
-  $('dup-count').textContent = closeIds.length;
-  $('close-all').onclick = () => closeTabs(closeIds);
+  const button = document.createElement('button');
+  button.className = 'ghost icon';
+  button.title = 'Close tab';
+  button.setAttribute('aria-label', `Close ${tab.title || tab.url}`);
+  button.innerHTML = CLOSE_ICON;
+  button.addEventListener('click', () => closeTabs([tab.id]));
+  li.append(button);
+  return li;
+}
+
+function renderPanel(id, rows) {
+  $(`${id}-list`).replaceChildren(...rows.map(({ tab, ...meta }) => tabRow(tab, meta)));
+  $(id).hidden = rows.length === 0;
+  $(`${id}-count`).textContent = rows.length;
+  $(`${id}-close-all`).onclick = (event) => {
+    event.preventDefault();
+    closeTabs(rows.map((r) => r.tab.id));
+  };
+}
+
+function daysAgo(time) {
+  const days = Math.floor((Date.now() - time) / 86_400_000);
+  return days >= 1 ? `${days}d` : '<1d';
+}
+
+function renderCleanup({ duplicates, stale }) {
+  renderPanel(
+    'duplicates',
+    duplicates.flatMap(({ keep, close }) => close.map((tab) => ({ tab, tooltip: `${tab.url}\nKeeping: ${keep.title || keep.url}` }))),
+  );
+  renderPanel(
+    'stale',
+    stale.map((tab) => ({ tab, tooltip: `${tab.url}\nLast used ${new Date(tab.lastAccessed).toLocaleString()}`, age: daysAgo(tab.lastAccessed) })),
+  );
+}
+
+// Each panel remembers whether it was collapsed; storage can be unavailable, so this is best effort.
+function rememberOpenState(id) {
+  try {
+    const saved = localStorage.getItem(`panel:${id}`);
+    if (saved !== null) $(id).open = saved === 'open';
+  } catch {}
+  $(id).addEventListener('toggle', () => {
+    try {
+      localStorage.setItem(`panel:${id}`, $(id).open ? 'open' : 'closed');
+    } catch {}
+  });
 }
 
 function renderActivity(activity) {
@@ -76,14 +111,13 @@ function renderActivity(activity) {
 
 async function refresh() {
   const state = await send('getState');
-  renderDuplicates(state.duplicates);
+  renderCleanup(state);
   renderActivity(state.activity);
   return state;
 }
 
 async function closeTabs(tabIds) {
-  const { duplicates } = await send('closeTabs', { tabIds });
-  renderDuplicates(duplicates);
+  renderCleanup(await send('closeTabs', { tabIds }));
 }
 
 async function organize() {
@@ -113,8 +147,9 @@ $('main').hidden = !state.configured;
 $('auto').checked = state.autoOrganize;
 showResult(state.lastResult);
 if (state.running) setStatus('Organizing...');
-renderDuplicates(state.duplicates);
+renderCleanup(state);
 renderActivity(state.activity);
+for (const id of ['duplicates', 'stale', 'activity']) rememberOpenState(id);
 
 const command = (await chrome.commands.getAll()).find((c) => c.name === 'organize-window');
 if (command?.shortcut) {

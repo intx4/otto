@@ -8,8 +8,7 @@ import {
   buildFullPrompt,
   buildIncrementalPrompt,
   parsePlan,
-  extractJson,
-} from '../src/plan.js';
+  extractJson, findStaleTabs } from '../src/plan.js';
 
 test('normalizeUrl strips hash, tracking params, trailing slash and lowercases host', () => {
   assert.equal(
@@ -117,4 +116,20 @@ test('extractJson tolerates code fences and surrounding prose', () => {
   assert.deepEqual(extractJson('```json\n{"groups":[]}\n```'), { groups: [] });
   assert.deepEqual(extractJson('Sure! Here you go: {"a":1} hope that helps'), { a: 1 });
   assert.equal(extractJson('no json here'), null);
+});
+
+test('findStaleTabs lists tabs unused for the threshold, oldest first, never active or pinned ones', () => {
+  const day = 86_400_000;
+  const now = 100 * day;
+  const tabs = [
+    { id: 1, lastAccessed: now - 8 * day },
+    { id: 2, lastAccessed: now - 2 * day },
+    { id: 3, lastAccessed: now - 30 * day },
+    { id: 4, lastAccessed: now - 7 * day },
+    { id: 5, lastAccessed: now - 40 * day, active: true },
+    { id: 6, lastAccessed: now - 40 * day, pinned: true },
+    { id: 7 },
+  ];
+  assert.deepEqual(findStaleTabs(tabs, { days: 7, now }).map((t) => t.id), [3, 1, 4]);
+  assert.deepEqual(findStaleTabs(tabs, { days: 0, now }), []);
 });
