@@ -15,7 +15,13 @@ const SAMPLES_PER_GROUP = 3;
 const MAX_UNGROUPED = 40;
 const BLANK_URL = /^(chrome:\/\/(newtab|new-tab-page)\/?|about:blank|chrome-search:\/\/)/;
 
+const ACTIVITY_LIMIT = 20;
+const SPINNER_COLOR = '#1a73e8';
+
 const debounceTimers = new Map();
+// Tabs whose load scheduled the pending auto run; they go first when the ungrouped list is capped.
+// Losing this to a service worker restart only loses that priority, not the run.
+const triggeredTabs = new Map();
 
 // Per-window run lock. A request arriving while a run is in flight is queued once;
 // a queued incremental run is upgraded to full if a full run is requested.
@@ -57,9 +63,11 @@ function prepare(kind, windowId, tabs, groups, settings) {
     return { tabsToSend: tabs, prompt: buildFullPrompt({ ...options, tabs, existingGroupTitles: groups.map((g) => g.title) }) };
   }
   // Every ungrouped tab is a candidate, so a tab can start a group with one that loaded in an earlier run.
+  const triggered = triggeredTabs.get(windowId) ?? new Set();
+  triggeredTabs.delete(windowId);
   const newTabs = tabs
     .filter((t) => t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !BLANK_URL.test(t.url ?? ''))
-    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+    .sort((a, b) => Number(triggered.has(b.id)) - Number(triggered.has(a.id)) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
     .slice(0, MAX_UNGROUPED);
   const withSamples = groups.map((g) => ({ title: g.title, samples: tabs.filter((t) => t.groupId === g.id).slice(0, SAMPLES_PER_GROUP) }));
   return { tabsToSend: newTabs, prompt: buildIncrementalPrompt({ ...options, newTabs, groups: withSamples }) };
@@ -78,17 +86,21 @@ async function execute(windowId, kind) {
     const sentKey = `lastSent:${windowId}`;
     const signature = tabsToSend.map((t) => `${t.id} ${t.url}`).sort().join('\n');
     if (kind === 'incremental' && (await chrome.storage.session.get(sentKey))[sentKey] === signature) {
+      await logActivity({ kind, message: 'Skipped: the ungrouped tabs have not changed since the last run.' });
       return { ok: true, message: 'Nothing new to organize.', skipped: true };
     }
 
-    const raw = await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA });
-    const plan = parsePlan(raw, prompt);
-
-    const assigned = new Set(plan.groups.flatMap((g) => g.tabIds));
-    const ungroupTabIds =
-      kind === 'full' ? tabs.filter((t) => t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && !assigned.has(t.id)).map((t) => t.id) : [];
-    const applied = await applyPlan(windowId, plan, { existingGroups: groups, ungroupTabIds });
+    const { plan, applied } = await withSpinner(async () => {
+      const raw = await complete(settings, { system: prompt.system, user: prompt.user, schema: PLAN_SCHEMA });
+      const plan = parsePlan(raw, prompt);
+      const assigned = new Set(plan.groups.flatMap((g) => g.tabIds));
+      const ungroupTabIds =
+        kind === 'full' ? tabs.filter((t) => t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && !assigned.has(t.id)).map((t) => t.id) : [];
+      return { plan, applied: await applyPlan(windowId, plan, { existingGroups: groups, ungroupTabIds }) };
+    });
     await chrome.storage.session.set({ [sentKey]: signature });
+    const groupOf = new Map(plan.groups.flatMap((g) => g.tabIds.map((id) => [id, g.name])));
+    const outcomes = tabsToSend.map((t) => ({ title: t.title || t.url, group: groupOf.get(t.id) ?? null }));
 
     await chrome.storage.session.set({ [`llmDuplicates:${windowId}`]: plan.duplicateClusters });
     const duplicates = await duplicatesFor(windowId);
@@ -99,10 +111,69 @@ async function execute(windowId, kind) {
         : applied.moved
           ? `Placed ${applied.moved} new tab${applied.moved === 1 ? '' : 's'}.`
           : 'New tabs left ungrouped.';
+    await logActivity({ kind, message: summary, tabs: outcomes });
     return await finish(windowId, { ok: true, message: summary, duplicateCount: closable });
   } catch (err) {
-    return await finish(windowId, { ok: false, message: err?.message || String(err) });
+    const message = err?.message || String(err);
+    await logActivity({ kind, message: `Failed: ${message}` });
+    return await finish(windowId, { ok: false, message });
   }
+}
+
+async function logActivity(entry) {
+  const { activity = [] } = await chrome.storage.session.get('activity');
+  await chrome.storage.session.set({ activity: [{ ...entry, at: Date.now() }, ...activity].slice(0, ACTIVITY_LIMIT) });
+}
+
+// Toolbar spinner: the icon dims and a rotating arc is drawn over it while any model request is in flight.
+let spinning = 0;
+let spinTimer = null;
+let iconBitmap = null;
+
+async function withSpinner(work) {
+  spinning += 1;
+  if (spinning === 1) startSpinner();
+  try {
+    return await work();
+  } finally {
+    spinning -= 1;
+    if (spinning === 0) {
+      clearInterval(spinTimer);
+      spinTimer = null;
+      await chrome.action.setIcon({ path: { 16: '/icons/icon16.png', 32: '/icons/icon32.png' } });
+    }
+  }
+}
+
+async function startSpinner() {
+  try {
+    iconBitmap ??= await createImageBitmap(await (await fetch(chrome.runtime.getURL('icons/icon32.png'))).blob());
+  } catch {
+    return;
+  }
+  if (spinning === 0 || spinTimer) return;
+  let frame = 0;
+  drawSpinnerFrame(frame);
+  spinTimer = setInterval(() => drawSpinnerFrame(++frame), 100);
+}
+
+function drawSpinnerFrame(frame) {
+  const imageData = {};
+  for (const size of [16, 32]) {
+    const ctx = new OffscreenCanvas(size, size).getContext('2d');
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(iconBitmap, 0, 0, size, size);
+    ctx.globalAlpha = 1;
+    const start = (frame * Math.PI) / 5;
+    ctx.lineWidth = size / 7;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = SPINNER_COLOR;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - ctx.lineWidth, start, start + Math.PI * 1.4);
+    ctx.stroke();
+    imageData[size] = ctx.getImageData(0, 0, size, size);
+  }
+  chrome.action.setIcon({ imageData }).catch(() => {});
 }
 
 async function finish(windowId, result) {
@@ -127,7 +198,8 @@ async function duplicatesFor(windowId) {
   return resolved.map((d) => ({ keep: byId.get(d.keep), close: d.close.map((id) => byId.get(id)) }));
 }
 
-function scheduleAuto(windowId) {
+function scheduleAuto(windowId, tabId) {
+  triggeredTabs.set(windowId, (triggeredTabs.get(windowId) ?? new Set()).add(tabId));
   clearTimeout(debounceTimers.get(windowId));
   debounceTimers.set(
     windowId,
@@ -140,11 +212,11 @@ function scheduleAuto(windowId) {
 
 // Stateless trigger: any ungrouped tab finishing a page load schedules an auto run for its window.
 // Holding no per-tab state means nothing is lost when Chrome stops the idle service worker.
-chrome.tabs.onUpdated.addListener(async (_tabId, info, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status !== 'complete' || tab.pinned || tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || BLANK_URL.test(tab.url ?? '')) return;
   const settings = await loadSettings();
   if (!settings.autoOrganize || !isConfigured(settings)) return;
-  scheduleAuto(tab.windowId);
+  scheduleAuto(tab.windowId, tabId);
 });
 
 chrome.commands.onCommand.addListener(async (command) => {
@@ -163,6 +235,8 @@ const HANDLERS = {
       configured: isConfigured(settings),
       autoOrganize: settings.autoOrganize,
       running: runners.has(windowId),
+      spinning: spinTimer !== null,
+      activity: (await chrome.storage.session.get('activity')).activity ?? [],
       lastResult,
       duplicates: await duplicatesFor(windowId),
     };

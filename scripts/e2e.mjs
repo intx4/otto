@@ -40,7 +40,7 @@ const server = http.createServer((req, res) => {
     const payload = JSON.parse(body);
     requests.push({ url: req.url, headers: req.headers, body, payload });
     inflight.max = Math.max(inflight.max, ++inflight.now);
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, req.url.startsWith('/slow/') ? 2500 : 300));
     inflight.now -= 1;
     if (req.url.startsWith('/broken/')) {
       res.statusCode = 500;
@@ -179,6 +179,25 @@ try {
   assert.equal(inflight.max, 1, 'runs for one window never overlap');
   assert.equal(requests.length - beforeBurst, 2, 'three requests collapse into one run plus one queued run');
   console.log('PASS concurrent organize requests serialized: 1 run + 1 queued');
+
+  await ext((s) => chrome.storage.local.set({ settings: { ...s, baseUrl: s.baseUrl.replace('/v1', '/slow/v1') } }), settings);
+  const getState = () => ext((windowId) => chrome.runtime.sendMessage({ type: 'getState', windowId }), windowId);
+  const slowRun = ext((windowId) => chrome.runtime.sendMessage({ type: 'organize', windowId }), windowId);
+  await new Promise((r) => setTimeout(r, 1200));
+  const during = await getState();
+  await slowRun;
+  const after = await getState();
+  assert.equal(during.spinning, true, 'spinner animates while the model request is in flight');
+  assert.equal(after.spinning, false, 'spinner stops when the run ends');
+  assert.match(after.activity[0].message, /^Organized \d+ tabs into \d+ groups\.$/);
+  const autoEntry = after.activity.find((e) => e.kind === 'incremental' && e.tabs?.some((t) => t.group === 'Cuscini'));
+  assert.ok(autoEntry, 'activity log records where each auto-run tab went');
+  const popupPage = await browser.newPage();
+  await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+  await popupPage.waitForSelector('#activity:not([hidden])');
+  assert.ok((await popupPage.$$eval('#activity-list .outcome', (els) => els.map((e) => e.textContent))).some((t) => t.endsWith('→ Cuscini')));
+  await popupPage.close();
+  console.log('PASS toolbar spinner runs during a model request; popup lists recent activity');
 
   await ext((s) => chrome.storage.local.set({ settings: { ...s, baseUrl: s.baseUrl.replace('/v1', '/broken/v1') } }), settings);
   const failure = await ext((windowId) => chrome.runtime.sendMessage({ type: 'organize', windowId }), windowId);

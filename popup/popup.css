@@ -128,3 +128,32 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
 }
+
+#activity {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+#activity summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+#activity-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+#activity-list li {
+  margin-bottom: 6px;
+}
+
+#activity-list .outcome {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

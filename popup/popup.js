@@ -41,6 +41,33 @@ function renderDuplicates(duplicates) {
   $('close-all').onclick = () => closeTabs(closeIds);
 }
 
+function renderActivity(activity) {
+  const list = $('activity-list');
+  list.replaceChildren();
+  for (const entry of activity) {
+    const li = document.createElement('li');
+    const head = document.createElement('div');
+    const when = new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    head.textContent = `${when} · ${entry.kind === 'full' ? 'Organize' : 'Auto'} · ${entry.message}`;
+    li.append(head);
+    for (const tab of entry.tabs ?? []) {
+      const line = document.createElement('div');
+      line.className = 'outcome';
+      line.textContent = `${tab.title} → ${tab.group ?? 'left ungrouped'}`;
+      li.append(line);
+    }
+    list.append(li);
+  }
+  $('activity').hidden = activity.length === 0;
+}
+
+async function refresh() {
+  const state = await send('getState');
+  renderDuplicates(state.duplicates);
+  renderActivity(state.activity);
+  return state;
+}
+
 async function closeTabs(tabIds) {
   const { duplicates } = await send('closeTabs', { tabIds });
   renderDuplicates(duplicates);
@@ -51,7 +78,7 @@ async function organize() {
   setStatus('Organizing...');
   try {
     showResult(await send('organize'));
-    renderDuplicates((await send('getState')).duplicates);
+    await refresh();
   } finally {
     $('organize').disabled = false;
   }
@@ -69,6 +96,7 @@ $('auto').checked = state.autoOrganize;
 showResult(state.lastResult);
 if (state.running) setStatus('Organizing...');
 renderDuplicates(state.duplicates);
+renderActivity(state.activity);
 
 $('organize').addEventListener('click', organize);
 $('auto').addEventListener('change', (e) => saveSettings({ autoOrganize: e.target.checked }));
