@@ -4,6 +4,8 @@
 
 OttO is a Chrome extension that sorts the tabs in your window into Chrome tab groups by topic. It sends each tab's title and URL to an LLM provider you choose, then creates named, colored groups from the reply. It also lists duplicate tabs you can close.
 
+**OttO collects nothing.** It has no server, no analytics, no telemetry and no tracking, and the developer never receives any data from it. Your settings, API keys, activity log and token usage stay in your browser on this device, and Chrome does not sync them. The only data that leaves your browser is the title and URL of the tabs OttO organizes, and it goes straight to the LLM provider you configure. Point OttO at a local model, such as Ollama or LM Studio, and nothing leaves your computer at all. See [PRIVACY.md](PRIVACY.md).
+
 <p align="center"><img src="docs/popup.png" width="355" alt="The OttO popup in dark mode, with the Organize window, Collapse all and Expand all buttons, the Auto-organize switch and Recent activity"></p>
 
 ## What it does
