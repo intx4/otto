@@ -15,11 +15,11 @@ Otto sends tab data only in these cases:
 
 By default Otto removes the query string and fragment from each URL before it sends it. If you turn on **Send full URLs**, Otto sends URLs unchanged.
 
-The provider receives this data under its own privacy policy. Anthropic and OpenAI are the built-in providers. If you enter a custom base URL, the data goes to that server.
+The provider receives this data under its own privacy policy. Anthropic, Amazon Bedrock and OpenAI are the built-in providers. If you enter a custom base URL, the data goes to that server.
 
 ## Data Otto stores
 
-Otto stores your settings, including your API key, in `chrome.storage.local` on your device. Chrome does not sync this storage. Otto keeps the result of the last run and the duplicate suggestions in `chrome.storage.session`, which Chrome clears when the browser closes.
+Otto stores your settings, including API keys and, if you use Amazon Bedrock with access keys, your AWS access key ID, secret access key and session token, in `chrome.storage.local` on your device. Chrome does not sync this storage. Otto does not encrypt it, so anyone with access to your browser profile can read these credentials. Otto keeps the result of the last run and the duplicate suggestions in `chrome.storage.session`, which Chrome clears when the browser closes.
 
 ## Data Otto does not collect
 
